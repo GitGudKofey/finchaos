@@ -2327,7 +2327,7 @@ function importData(e) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function (evt) {
+    reader.onload = async function (evt) {
         try {
             const parsed = JSON.parse(evt.target.result);
             if (parsed && Array.isArray(parsed.expenses)) {
@@ -2340,6 +2340,59 @@ function importData(e) {
                 }
 
                 saveStateToStorage();
+
+                if (state.authMode === 'supabase' && state.currentUser) {
+                    const userId = state.currentUser.id;
+                    try {
+                        // Clear old cloud records to overwrite with imported file
+                        await supabaseClient.from('expenses').delete().eq('user_id', userId);
+                        await supabaseClient.from('budgets').delete().eq('user_id', userId);
+
+                        // Upload expenses
+                        if (state.expenses.length > 0) {
+                            const dbRows = state.expenses.map(exp => ({
+                                id: exp.id || ('exp-' + Date.now() + Math.random().toString(36).substr(2, 5)),
+                                user_id: userId,
+                                subscription_id: exp.subscriptionId,
+                                type: exp.type || 'subscription',
+                                period: exp.period || 'monthly',
+                                name: exp.name,
+                                amount: exp.amount,
+                                currency: exp.currency,
+                                category: exp.category,
+                                date: exp.date,
+                                link: exp.link,
+                                comment: exp.comment,
+                                active: exp.active !== undefined ? exp.active : true,
+                                paid: exp.paid !== undefined ? exp.paid : false,
+                                deleted: exp.deleted !== undefined ? exp.deleted : false
+                            }));
+
+                            const chunkSize = 50;
+                            for (let i = 0; i < dbRows.length; i += chunkSize) {
+                                const chunk = dbRows.slice(i, i + chunkSize);
+                                await supabaseClient.from('expenses').insert(chunk);
+                            }
+                        }
+
+                        // Upload budgets
+                        const dbBudgets = Object.keys(state.budgets).map(key => ({
+                            user_id: userId,
+                            month_key: key,
+                            limit_val: state.budgets[key]
+                        }));
+                        if (dbBudgets.length > 0) {
+                            await supabaseClient.from('budgets').upsert(dbBudgets);
+                        }
+
+                        // Save settings
+                        await saveSettingsToSupabase();
+                    } catch (dbErr) {
+                        console.error('Failed to sync imported data to Supabase:', dbErr);
+                        alert('Локально данные импортированы, но не удалось отправить их в облако: ' + dbErr.message);
+                    }
+                }
+
                 alert('Данные успешно импортированы!');
                 closeSettingsModal();
                 updateUI();
