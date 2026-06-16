@@ -7,7 +7,7 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Main CSS -->
     <link rel="stylesheet" href="style.css">
     <!-- Supabase JS SDK -->
@@ -125,63 +125,84 @@
             <div class="main-content-inner">
                 <!-- Dashboard View -->
                 <div id="view-dashboard" class="app-view">
-                    <!-- Top Header -->
-            <header class="header">
-                <div class="header-title-wrapper">
-                    <h1>Управление расходами</h1>
-                    <p class="subtitle">Планируйте свои подписки и регулярные платежи</p>
-                </div>
-                
-                <div class="header-actions">
-                    <!-- Month Switcher -->
-                    <div class="month-selector-wrapper" style="position: relative;">
-                        <button class="btn-icon" id="prev-month" title="Предыдущий месяц">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                        </button>
-                        <span class="current-month-label" id="current-month-display" style="cursor: pointer; user-select: none;" title="Открыть выбор месяца">Июнь 2026</span>
-                        <button class="btn-icon" id="next-month" title="Следующий месяц">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                        </button>
-                        
-                        <!-- Popover Dropdown -->
-                        <div class="month-picker-dropdown hidden" id="month-picker-dropdown">
-                            <div class="month-picker-header">
-                                <button type="button" class="btn-icon picker-year-btn" id="picker-prev-year" title="Предыдущий год">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                                </button>
-                                <span class="picker-year-label" id="picker-year-display">2026</span>
-                                <button type="button" class="btn-icon picker-year-btn" id="picker-next-year" title="Следующий год">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                                </button>
+                    <!-- Stories Widget -->
+                    <section class="stories-container" id="dashboard-stories" style="margin-bottom: 24px; padding: 12px 6px; margin-left: -6px; margin-right: -6px; overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                        <div class="stories-scroll" style="display: flex; gap: 16px;">
+                            <div class="story-circle-card" onclick="openStory(0)" style="background-image: url('assets/currency_story.png');">
+                                <div class="story-card-overlay">
+                                    <span class="story-card-text">Авто-курсы ЦБ</span>
+                                </div>
                             </div>
-                            <div class="month-picker-grid" id="month-picker-grid">
-                                <button type="button" class="month-picker-cell" data-month="0">Янв</button>
-                                <button type="button" class="month-picker-cell" data-month="1">Фев</button>
-                                <button type="button" class="month-picker-cell" data-month="2">Мар</button>
-                                <button type="button" class="month-picker-cell" data-month="3">Апр</button>
-                                <button type="button" class="month-picker-cell" data-month="4">Май</button>
-                                <button type="button" class="month-picker-cell" data-month="5">Июн</button>
-                                <button type="button" class="month-picker-cell" data-month="6">Июл</button>
-                                <button type="button" class="month-picker-cell" data-month="7">Авг</button>
-                                <button type="button" class="month-picker-cell" data-month="8">Сен</button>
-                                <button type="button" class="month-picker-cell" data-month="9">Окт</button>
-                                <button type="button" class="month-picker-cell" data-month="10">Ноя</button>
-                                <button type="button" class="month-picker-cell" data-month="11">Дек</button>
+                            <div class="story-circle-card" onclick="openStory(1)" style="background-image: url('assets/data_story.png');">
+                                <div class="story-card-overlay">
+                                    <span class="story-card-text">Новый экспорт</span>
+                                </div>
+                            </div>
+                            <div class="story-circle-card" onclick="openStory(2)" style="background-image: url('assets/cloud_story.png');">
+                                <div class="story-card-overlay">
+                                    <span class="story-card-text">Облачная синхронизация</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    </section>
 
-                    <!-- Global Currency Switcher -->
-                    <div class="currency-selector-wrapper">
-                        <label for="global-currency-select" class="currency-label">Валюта:</label>
-                        <select id="global-currency-select" class="select-styled">
-                            <option value="RUB" selected>RUB (₽)</option>
-                            <option value="USD">USD ($)</option>
-                            <option value="EUR">EUR (€)</option>
-                        </select>
-                    </div>
-                </div>
-            </header>
+                    <!-- Top Header -->
+                    <header class="header">
+                        <div class="header-title-wrapper">
+                            <h1>Управление расходами</h1>
+                            <p class="subtitle">Планируйте свои подписки и регулярные платежи</p>
+                        </div>
+                        
+                        <div class="header-actions">
+                            <!-- Month Switcher -->
+                            <div class="month-selector-wrapper" style="position: relative;">
+                                <button class="btn-icon" id="prev-month" title="Предыдущий месяц">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                                </button>
+                                <span class="current-month-label" id="current-month-display" style="cursor: pointer; user-select: none;" title="Открыть выбор месяца">Июнь 2026</span>
+                                <button class="btn-icon" id="next-month" title="Следующий месяц">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                </button>
+                                
+                                <!-- Popover Dropdown -->
+                                <div class="month-picker-dropdown hidden" id="month-picker-dropdown">
+                                    <div class="month-picker-header">
+                                        <button type="button" class="btn-icon picker-year-btn" id="picker-prev-year" title="Предыдущий год">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                                        </button>
+                                        <span class="picker-year-label" id="picker-year-display">2026</span>
+                                        <button type="button" class="btn-icon picker-year-btn" id="picker-next-year" title="Следующий год">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                        </button>
+                                    </div>
+                                    <div class="month-picker-grid" id="month-picker-grid">
+                                        <button type="button" class="month-picker-cell" data-month="0">Янв</button>
+                                        <button type="button" class="month-picker-cell" data-month="1">Фев</button>
+                                        <button type="button" class="month-picker-cell" data-month="2">Мар</button>
+                                        <button type="button" class="month-picker-cell" data-month="3">Апр</button>
+                                        <button type="button" class="month-picker-cell" data-month="4">Май</button>
+                                        <button type="button" class="month-picker-cell" data-month="5">Июн</button>
+                                        <button type="button" class="month-picker-cell" data-month="6">Июл</button>
+                                        <button type="button" class="month-picker-cell" data-month="7">Авг</button>
+                                        <button type="button" class="month-picker-cell" data-month="8">Сен</button>
+                                        <button type="button" class="month-picker-cell" data-month="9">Окт</button>
+                                        <button type="button" class="month-picker-cell" data-month="10">Ноя</button>
+                                        <button type="button" class="month-picker-cell" data-month="11">Дек</button>
+                                    </div>
+                                </div>
+                            </div>
+        
+                            <!-- Global Currency Switcher -->
+                            <div class="currency-selector-wrapper">
+                                <label for="global-currency-select" class="currency-label">Валюта:</label>
+                                <select id="global-currency-select" class="select-styled">
+                                    <option value="RUB" selected>RUB (₽)</option>
+                                    <option value="USD">USD ($)</option>
+                                    <option value="EUR">EUR (€)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </header>
 
             <!-- Stats Overview Cards -->
             <section class="stats-grid">
@@ -267,11 +288,6 @@
                         <div class="filter-select-wrapper">
                             <select id="category-filter" class="select-styled">
                                 <option value="all">Все категории</option>
-                                <option value="software">Софт / Инструменты</option>
-                                <option value="entertainment">Развлечения / Медиа</option>
-                                <option value="work">Работа / Проекты</option>
-                                <option value="utilities">Связь и хостинг</option>
-                                <option value="other">Другое</option>
                             </select>
                         </div>
 
@@ -305,10 +321,6 @@
                                 <span>Календарь</span>
                             </button>
                         </div>
-                        <button class="btn-secondary" id="btn-export-ics" title="Экспорт подписок в .ics файл" style="display: flex; align-items: center; gap: 6px; height: 42px;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                            <span>Экспорт .ics</span>
-                        </button>
                     </div>
                     
                     <button class="btn-primary" id="btn-add-expense">
@@ -337,6 +349,7 @@
 
                 <!-- Expenses Calendar View -->
                 <div class="expenses-calendar-view hidden" id="expenses-calendar-view">
+
                     <div class="calendar-grid-header">
                         <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
                     </div>
@@ -470,11 +483,6 @@
                         <div class="filter-select-wrapper">
                             <select id="sub-category-filter" class="select-styled">
                                 <option value="all">Все категории</option>
-                                <option value="software">Софт / Инструменты</option>
-                                <option value="entertainment">Развлечения / Медиа</option>
-                                <option value="work">Работа / Проекты</option>
-                                <option value="utilities">Связь и хостинг</option>
-                                <option value="other">Другое</option>
                             </select>
                         </div>
                     </div>
@@ -573,11 +581,6 @@
                     <div class="form-group">
                         <label for="expense-category" class="form-label">Категория</label>
                         <select id="expense-category" class="select-styled w-100">
-                            <option value="software">Софт / Инструменты</option>
-                            <option value="entertainment">Развлечения / Медиа</option>
-                            <option value="work">Работа / Проекты</option>
-                            <option value="utilities">Связь и хостинг</option>
-                            <option value="other">Другое</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -684,25 +687,113 @@
                 </div>
                 
                 <hr style="border: none; border-top: 1px solid var(--border-color); margin: 8px 0;">
-                
-                <!-- Backup & Restore -->
+
+                <!-- Category Management -->
                 <div class="settings-section">
-                    <h3 class="settings-section-title" style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">Резервное копирование</h3>
-                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Выгружайте свои данные в файл или восстанавливайте их из бэкапа.</p>
-                    <div class="form-row" style="gap: 12px;">
-                        <button type="button" class="btn-secondary flex-1" id="btn-export-data" style="justify-content: center; font-size: 13px; display: flex; align-items: center; gap: 6px;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                            <span>Экспорт</span>
-                        </button>
-                        <button type="button" class="btn-secondary flex-1" id="btn-trigger-import" style="justify-content: center; font-size: 13px; display: flex; align-items: center; gap: 6px;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                            <span>Импорт</span>
-                        </button>
-                        <input type="file" id="import-file-input" style="display: none;" accept=".json">
+                    <h3 class="settings-section-title" style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">Категории расходов</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Управляйте категориями трат. Системные категории защищены от изменения.</p>
+                    
+                    <div class="categories-manager">
+                        <!-- Create form -->
+                        <div class="category-form">
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" id="new-category-name" class="form-input" placeholder="Название новой категории..." style="flex-grow: 1; height: 36px; font-size: 13px;">
+                                <button type="button" class="btn-primary" id="btn-add-category" style="height: 36px; padding: 0 14px; font-size: 13px;">Добавить</button>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                                <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary);">Цвет категории:</span>
+                                <div class="color-presets-picker" id="category-color-picker">
+                                    <div class="color-preset-circle purple selected" data-color="purple" title="Фиолетовый"></div>
+                                    <div class="color-preset-circle pink" data-color="pink" title="Розовый"></div>
+                                    <div class="color-preset-circle orange" data-color="orange" title="Оранжевый"></div>
+                                    <div class="color-preset-circle teal" data-color="teal" title="Бирюзовый"></div>
+                                    <div class="color-preset-circle indigo" data-color="indigo" title="Индиго"></div>
+                                    <div class="color-preset-circle cyan" data-color="cyan" title="Голубой"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Categories List -->
+                        <div class="categories-list" id="settings-categories-list">
+                            <!-- Populated dynamically -->
+                        </div>
                     </div>
+                </div>
+
+                <hr style="border: none; border-top: 1px solid var(--border-color); margin: 8px 0;">
+                
+                <!-- Data Management -->
+                <div class="settings-section">
+                    <h3 class="settings-section-title" style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">Управление данными</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Выгружайте свои данные в резервные копии, таблицы и календари или восстанавливайте их.</p>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+                        <button type="button" class="btn-secondary" id="btn-trigger-import" title="Восстановить все расходы, лимиты бюджетов и настройки из сохраненной резервной копии JSON" style="justify-content: center; font-size: 12px; display: flex; align-items: center; gap: 6px; padding: 10px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            <span>Импорт бэкапа (JSON)</span>
+                        </button>
+                        <button type="button" class="btn-secondary" id="btn-export-data" title="Сохранить полную резервную копию всех ваших данных в файл JSON для последующего восстановления" style="justify-content: center; font-size: 12px; display: flex; align-items: center; gap: 6px; padding: 10px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            <span>Экспорт бэкапа (JSON)</span>
+                        </button>
+                        <button type="button" class="btn-secondary" id="btn-export-csv" title="Скачать список всех расходов в формате таблицы .csv для анализа в Excel, Google Таблицах или Numbers" style="justify-content: center; font-size: 12px; display: flex; align-items: center; gap: 6px; padding: 10px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>
+                            <span>Экспорт CSV (Excel)</span>
+                        </button>
+                        <button type="button" class="btn-secondary" id="btn-export-ics" title="Экспортировать активные подписки в формате .ics для Google Календаря, Apple Calendar или Outlook" style="justify-content: center; font-size: 12px; display: flex; align-items: center; gap: 6px; padding: 10px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            <span>Экспорт ICS (Календарь)</span>
+                        </button>
+                    </div>
+                    <input type="file" id="import-file-input" style="display: none;" accept=".json">
+                    
+                    <button type="button" class="btn-secondary w-100" id="btn-start-tour" style="justify-content: center; font-size: 12px; display: flex; align-items: center; gap: 6px; padding: 8px; border-style: dashed; border-color: var(--primary);">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                        <span>Начать экскурсию по сайту</span>
+                    </button>
                 </div>
                 <div class="modal-footer" style="padding-top: 12px;">
                     <button type="button" class="btn-primary w-100" id="btn-save-settings" style="justify-content: center;">Сохранить настройки</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Stories Viewer -->
+    <div class="modal-overlay" id="story-viewer-modal" style="background-color: rgba(15, 23, 42, 0.95); z-index: 10010; align-items: center; justify-content: center; display: none;">
+        <div class="story-viewer-container">
+            <button class="story-viewer-close" onclick="closeStory()">&times;</button>
+            
+            <button class="story-nav-btn prev" onclick="prevStory()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 20px; height: 20px;"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+            <button class="story-nav-btn next" onclick="nextStory()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 20px; height: 20px;"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+            
+            <div class="story-viewer-card" id="story-viewer-card-body">
+                <div class="story-progress-bar-container" id="story-progress-bars">
+                    <!-- Progress segments dynamically added -->
+                </div>
+                <div class="story-viewer-header">
+                    <div class="story-brand-wrapper" style="display: flex; align-items: center; gap: 8px;">
+                        <div class="story-brand-icon" style="color: var(--primary); width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 100%; height: 100%;">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M12 6v12M15 9H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H8"></path>
+                            </svg>
+                        </div>
+                        <span class="story-brand" style="color: white; font-size: 13px; font-weight: 700; font-family: 'Inter', sans-serif;">FinChaos</span>
+                    </div>
+                    <button class="story-pause-btn" id="story-pause-btn" onclick="toggleStoryPause()">
+                        <svg id="story-pause-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 14px; height: 14px; color: white;"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                    </button>
+                </div>
+                <div class="story-viewer-content" id="story-viewer-image">
+                    <div class="story-viewer-text-block">
+                        <h2 id="story-viewer-title">Автоматические курсы валют</h2>
+                        <p id="story-viewer-desc">Мы добавили автоматическое обновление курсов валют по данным ЦБ РФ! Больше никаких ручных корректировок — курсы обновляются при каждой загрузке страницы.</p>
+                        <button class="story-cta-btn" id="story-viewer-cta" onclick="handleStoryCTA()">Включить автообновление</button>
+                    </div>
                 </div>
             </div>
         </div>

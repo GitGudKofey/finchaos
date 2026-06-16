@@ -66,9 +66,12 @@ let state = {
 // ==========================================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
+    initCategories();
     initAuthModeAndClient();
     await checkUserSession();
     initEventListeners();
+    setupStoriesHoldListeners();
+    populateCategoryDropdowns();
     initAuthUI();
     await loadExchangeRates();
 });
@@ -145,6 +148,9 @@ function initAuthUI() {
 
         loadStateFromSupabase().then(() => {
             updateUI();
+            if (!localStorage.getItem('finchaos_onboarding_completed')) {
+                setTimeout(() => startOnboardingTour(), 1500);
+            }
         });
     } else if (state.authMode === 'demo') {
         if (viewAuth) viewAuth.classList.add('hidden');
@@ -163,6 +169,9 @@ function initAuthUI() {
 
         loadStateFromStorage();
         updateUI();
+        if (!localStorage.getItem('finchaos_onboarding_completed')) {
+            setTimeout(() => startOnboardingTour(), 1500);
+        }
     } else {
         if (viewAuth) viewAuth.classList.remove('hidden');
         if (appContainer) appContainer.classList.add('hidden');
@@ -278,6 +287,9 @@ function setupAuthFormListeners() {
         state.authMode = 'demo';
         localStorage.setItem('finchaos_auth_mode', 'demo');
         initAuthUI();
+        if (!localStorage.getItem('finchaos_onboarding_completed')) {
+            setTimeout(() => startOnboardingTour(), 1000);
+        }
     }
 
     const tabSignin = document.getElementById('auth-tab-signin');
@@ -469,6 +481,12 @@ async function migrateLocalDataToSupabase(userId) {
             rate_usd: rates.USD || 90,
             rate_eur: rates.EUR || 98
         }, { onConflict: 'user_id' });
+
+        // Clear local storage after successful migration so database is single source of truth
+        localStorage.removeItem('finchaos_expenses');
+        localStorage.removeItem('finchaos_budgets');
+        localStorage.removeItem('finchaos_currency');
+        localStorage.removeItem('finchaos_rates');
 
     } catch (err) {
         console.error('Failed to migrate data to Supabase:', err);
@@ -1233,13 +1251,10 @@ function renderCategoryChart(currentMonthExpenses) {
         return;
     }
 
-    const categoryColors = {
-        software: '#3B82F6',      // Blue
-        entertainment: '#EF4444', // Red
-        work: '#10B981',          // Emerald
-        utilities: '#84CC16',     // Lime
-        other: '#6B7280'          // Slate
-    };
+    const categoryColors = {};
+    Object.keys(state.categories).forEach(id => {
+        categoryColors[id] = getCategoryColorHex(id);
+    });
 
     const data = Object.keys(categoryTotals).map(cat => ({
         category: cat,
@@ -1490,17 +1505,24 @@ function renderExpenses(currentMonthExpenses) {
 
         const paidLabel = exp.paid ? 'Оплачено' : 'Ожидает оплаты';
 
+        // Comment block (always show, displaying "Нет описания" if empty)
+        const commentBlockHtml = `
+            <div class="card-comment-block" style="margin-top: 16px;">
+                <div class="card-comment-text">${formatComment(exp.comment)}</div>
+            </div>
+        `;
+
         card.innerHTML = `
             <div>
                 <div class="card-header-row">
                     <div class="card-title-group">
-                        <div class="service-icon-box badge-${exp.category}">
+                        <div class="service-icon-box ${getCategoryBadgeClass(exp.category)}">
                             ${initials}
                         </div>
                         <div class="card-title-info">
                             <span class="expense-name" title="${exp.name}">${exp.name}</span>
                             <div>
-                                <span class="badge-category badge-${exp.category}">${CATEGORY_MAP[exp.category]}</span>
+                                <span class="badge-category ${getCategoryBadgeClass(exp.category)}">${CATEGORY_MAP[exp.category] || exp.category}</span>
                                 ${typeBadgeHtml}
                             </div>
                         </div>
@@ -1527,9 +1549,7 @@ function renderExpenses(currentMonthExpenses) {
                     </div>
                 </div>
 
-                <div class="card-comment-block">
-                    <div class="card-comment-text">${formatComment(exp.comment)}</div>
-                </div>
+                ${commentBlockHtml}
             </div>
 
             <div class="card-footer">
@@ -1805,6 +1825,25 @@ function initEventListeners() {
         });
     }
 
+    // CSV Export button listener
+    const exportCsvBtn = document.getElementById('btn-export-csv');
+    if (exportCsvBtn) {
+        exportCsvBtn.addEventListener('click', () => {
+            exportToCSV();
+        });
+    }
+
+    // Start Tour button listener
+    const startTourBtn = document.getElementById('btn-start-tour');
+    if (startTourBtn) {
+        startTourBtn.addEventListener('click', () => {
+            closeSettingsModal();
+            startOnboardingTour();
+        });
+    }
+
+
+
     document.getElementById('btn-add-subscription-tab').addEventListener('click', () => {
         openExpenseModal();
     });
@@ -1835,6 +1874,19 @@ function initEventListeners() {
     const autoUpdateCheckbox = document.getElementById('rates-auto-update-input');
     if (autoUpdateCheckbox) {
         autoUpdateCheckbox.addEventListener('change', syncRatesInputState);
+    }
+
+    const btnAddCategory = document.getElementById('btn-add-category');
+    if (btnAddCategory) {
+        btnAddCategory.addEventListener('click', addCategory);
+    }
+    const newCategoryInput = document.getElementById('new-category-name');
+    if (newCategoryInput) {
+        newCategoryInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                addCategory();
+            }
+        });
     }
 }
 
@@ -2297,6 +2349,8 @@ function openSettingsModal() {
     document.getElementById('rate-eur-input').value = state.rates.EUR;
     
     syncRatesInputState();
+    renderSettingsCategories();
+    initCategoryColorPicker();
     modalEl.classList.add('active');
 }
 
@@ -2335,11 +2389,19 @@ function saveSettingsForm() {
 }
 
 function exportData() {
+    const customCategories = {};
+    Object.keys(state.categories).forEach(id => {
+        if (!state.categories[id].system) {
+            customCategories[id] = state.categories[id];
+        }
+    });
+
     const backup = {
         expenses: state.expenses,
         budgets: state.budgets,
         rates: state.rates,
-        globalCurrency: state.globalCurrency
+        globalCurrency: state.globalCurrency,
+        customCategories: customCategories
     };
 
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup, null, 2));
@@ -2360,6 +2422,13 @@ function importData(e) {
         try {
             const parsed = JSON.parse(evt.target.result);
             if (parsed && Array.isArray(parsed.expenses)) {
+                // Restore custom categories if they exist in backup
+                if (parsed.customCategories) {
+                    localStorage.setItem('finchaos_custom_categories', JSON.stringify(parsed.customCategories));
+                    initCategories();
+                    populateCategoryDropdowns();
+                }
+
                 // Generate fresh unique IDs to avoid primary key conflicts
                 const remappedExpenses = remapIds(parsed.expenses);
                 state.expenses = remappedExpenses;
@@ -2625,7 +2694,7 @@ function renderSubscriptionsTable() {
                 </div>
             </td>
             <td>
-                <span class="badge-category badge-${sub.category}">${CATEGORY_MAP[sub.category]}</span>
+                <span class="badge-category ${getCategoryBadgeClass(sub.category)}">${CATEGORY_MAP[sub.category] || sub.category}</span>
             </td>
             <td>
                 <span class="badge-type badge-type-subscription">${PERIOD_MAP[sub.period || 'monthly']}</span>
@@ -2788,7 +2857,7 @@ function renderCalendarView(currentMonthExpenses) {
             const isSubscription = exp.type === 'subscription';
             const isSuspended = isSubscription && !exp.active;
 
-            tag.className = `calendar-event-tag badge-${exp.category} ${exp.paid ? 'paid' : 'unpaid'} ${isSuspended ? 'suspended' : ''}`;
+            tag.className = `calendar-event-tag ${getCategoryBadgeClass(exp.category)} ${exp.paid ? 'paid' : 'unpaid'} ${isSuspended ? 'suspended' : ''}`;
 
             const priceStr = formatCurrency(exp.amount, exp.currency);
             tag.innerHTML = `
@@ -3122,3 +3191,867 @@ function exportToICS() {
     link.click();
     document.body.removeChild(link);
 }
+
+// ==========================================================================
+// Excel/CSV File Exporter (Russian Excel compatible UTF-8 BOM)
+// ==========================================================================
+function exportToCSV() {
+    const expenses = state.expenses.filter(exp => !exp.deleted);
+    if (expenses.length === 0) {
+        alert('У вас нет расходов для экспорта!');
+        return;
+    }
+
+    // CSV Headers
+    const headers = ['Название', 'Тип', 'Период', 'Сумма', 'Валюта', 'Категория', 'Дата', 'Ссылка', 'Комментарий', 'Активен', 'Оплачен'];
+    
+    const rows = expenses.map(exp => [
+        exp.name,
+        exp.type === 'subscription' ? 'Подписка' : 'Разовый',
+        exp.period ? PERIOD_MAP[exp.period] : '',
+        exp.amount,
+        exp.currency,
+        CATEGORY_MAP[exp.category] || exp.category,
+        exp.date,
+        exp.link || '',
+        exp.comment || '',
+        exp.active ? 'Да' : 'Нет',
+        exp.paid ? 'Да' : 'Нет'
+    ]);
+
+    // Format as CSV content
+    // Use \ufeff (UTF-8 BOM) so Excel opens Cyrillic characters correctly in UTF-8
+    let csvContent = '\uFEFF';
+    csvContent += [headers.join(';'), ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(';'))].join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `finchaos_export_${getCurrentMonthKey()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// ==========================================================================
+// Category Management Logic
+// ==========================================================================
+function initCategories() {
+    const stored = localStorage.getItem('finchaos_custom_categories');
+    let custom = {};
+    if (stored) {
+        try {
+            custom = JSON.parse(stored);
+        } catch (e) {
+            console.error('Failed to parse custom categories:', e);
+        }
+    }
+    
+    state.categories = {
+        software: { name: 'Софт / Инструменты', color: 'blue', system: true },
+        entertainment: { name: 'Развлечения / Медиа', color: 'red', system: true },
+        work: { name: 'Работа / Проекты', color: 'green', system: true },
+        utilities: { name: 'Связь и хостинг', color: 'teal', system: true },
+        other: { name: 'Другое', color: 'slate', system: true }
+    };
+    
+    Object.keys(custom).forEach(id => {
+        state.categories[id] = custom[id];
+    });
+
+    // Sync CATEGORY_MAP
+    Object.keys(CATEGORY_MAP).forEach(key => {
+        if (key !== 'software' && key !== 'entertainment' && key !== 'work' && key !== 'utilities' && key !== 'other') {
+            delete CATEGORY_MAP[key];
+        }
+    });
+    Object.keys(state.categories).forEach(id => {
+        CATEGORY_MAP[id] = state.categories[id].name;
+    });
+}
+window.initCategories = initCategories;
+
+function getCategoryBadgeClass(categoryId) {
+    const cat = state.categories[categoryId];
+    if (!cat) return 'badge-other';
+    if (cat.system) {
+        return `badge-${categoryId}`;
+    } else {
+        return `badge-${cat.color}`;
+    }
+}
+window.getCategoryBadgeClass = getCategoryBadgeClass;
+
+function getCategoryColorHex(categoryId) {
+    const systemColors = {
+        software: '#3B82F6',
+        entertainment: '#EF4444',
+        work: '#10B981',
+        utilities: '#84CC16',
+        other: '#6B7280'
+    };
+    if (systemColors[categoryId]) return systemColors[categoryId];
+
+    const presetColors = {
+        purple: '#7C3AED',
+        pink: '#DB2777',
+        orange: '#EA580C',
+        teal: '#0D9488',
+        indigo: '#4F46E5',
+        cyan: '#0891B2'
+    };
+
+    const cat = state.categories[categoryId];
+    if (cat && presetColors[cat.color]) {
+        return presetColors[cat.color];
+    }
+    return '#6B7280';
+}
+window.getCategoryColorHex = getCategoryColorHex;
+
+function populateCategoryDropdowns() {
+    const categoryFilter = document.getElementById('category-filter');
+    const subCategoryFilter = document.getElementById('sub-category-filter');
+    const expenseCategory = document.getElementById('expense-category');
+
+    const valFilter = categoryFilter ? categoryFilter.value : 'all';
+    const valSubFilter = subCategoryFilter ? subCategoryFilter.value : 'all';
+    const valExpCat = expenseCategory ? expenseCategory.value : 'software';
+
+    if (categoryFilter) categoryFilter.innerHTML = '<option value="all">Все категории</option>';
+    if (subCategoryFilter) subCategoryFilter.innerHTML = '<option value="all">Все категории</option>';
+    if (expenseCategory) expenseCategory.innerHTML = '';
+
+    Object.keys(state.categories).forEach(id => {
+        const cat = state.categories[id];
+        
+        if (categoryFilter) {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = cat.name;
+            categoryFilter.appendChild(opt);
+        }
+        
+        if (subCategoryFilter) {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = cat.name;
+            subCategoryFilter.appendChild(opt);
+        }
+        
+        if (expenseCategory) {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = cat.name;
+            expenseCategory.appendChild(opt);
+        }
+    });
+
+    if (categoryFilter) categoryFilter.value = state.categories[valFilter] ? valFilter : 'all';
+    if (subCategoryFilter) subCategoryFilter.value = state.categories[valSubFilter] ? valSubFilter : 'all';
+    if (expenseCategory) expenseCategory.value = state.categories[valExpCat] ? valExpCat : Object.keys(state.categories)[0] || 'other';
+
+    [categoryFilter, subCategoryFilter, expenseCategory].forEach(select => {
+        if (select && select.nextElementSibling && select.nextElementSibling.classList.contains('custom-select-container')) {
+            select.nextElementSibling.remove();
+        }
+    });
+    initCustomSelects();
+}
+window.populateCategoryDropdowns = populateCategoryDropdowns;
+
+function renderSettingsCategories() {
+    const listEl = document.getElementById('settings-categories-list');
+    if (!listEl) return;
+    
+    listEl.innerHTML = '';
+    
+    Object.keys(state.categories).forEach(id => {
+        const cat = state.categories[id];
+        const item = document.createElement('div');
+        item.className = 'category-item';
+        item.dataset.id = id;
+        
+        const badgeClass = cat.system ? `badge-${id}` : `badge-${cat.color}`;
+        const nameDisplay = `<span class="badge-category ${badgeClass}">${cat.name}</span>`;
+        
+        let actionsHtml = '';
+        if (cat.system) {
+            actionsHtml = `
+                <span style="color: var(--text-muted); padding: 6px; display: flex; align-items: center;" title="Системная категория защищена">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                </span>
+            `;
+        } else {
+            actionsHtml = `
+                <button type="button" class="btn-card-action btn-edit-cat" title="Редактировать" onclick="editCategoryInline('${id}')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                </button>
+                <button type="button" class="btn-card-action btn-delete-cat" title="Удалить" onclick="deleteCategory('${id}')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+            `;
+        }
+        
+        item.innerHTML = `
+            <div class="category-item-info">
+                ${nameDisplay}
+            </div>
+            <div class="category-item-actions">
+                ${actionsHtml}
+            </div>
+        `;
+        listEl.appendChild(item);
+    });
+}
+window.renderSettingsCategories = renderSettingsCategories;
+
+function editCategoryInline(id) {
+    const itemEl = document.querySelector(`.category-item[data-id="${id}"]`);
+    if (!itemEl) return;
+    
+    const cat = state.categories[id];
+    if (!cat || cat.system) return;
+    
+    const infoEl = itemEl.querySelector('.category-item-info');
+    const actionsEl = itemEl.querySelector('.category-item-actions');
+    
+    const oldInfoHtml = infoEl.innerHTML;
+    const oldActionsHtml = actionsEl.innerHTML;
+    
+    infoEl.innerHTML = `
+        <input type="text" class="category-item-name-input" value="${cat.name}">
+    `;
+    
+    actionsEl.innerHTML = `
+        <button type="button" class="btn-card-action btn-save-cat-inline" title="Сохранить" style="color: var(--success-text);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </button>
+        <button type="button" class="btn-card-action btn-cancel-cat-inline" title="Отмена" style="color: var(--text-muted);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+    `;
+    
+    const input = infoEl.querySelector('.category-item-name-input');
+    input.focus();
+    input.select();
+    
+    actionsEl.querySelector('.btn-save-cat-inline').addEventListener('click', () => {
+        const newName = input.value.trim();
+        if (!newName) {
+            alert('Название категории не может быть пустым!');
+            return;
+        }
+        
+        state.categories[id].name = newName;
+        CATEGORY_MAP[id] = newName;
+        
+        saveCustomCategoriesToStorage();
+        
+        renderSettingsCategories();
+        populateCategoryDropdowns();
+        updateUI();
+    });
+    
+    actionsEl.querySelector('.btn-cancel-cat-inline').addEventListener('click', () => {
+        infoEl.innerHTML = oldInfoHtml;
+        actionsEl.innerHTML = oldActionsHtml;
+    });
+    
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            actionsEl.querySelector('.btn-save-cat-inline').click();
+        } else if (e.key === 'Escape') {
+            actionsEl.querySelector('.btn-cancel-cat-inline').click();
+        }
+    });
+}
+window.editCategoryInline = editCategoryInline;
+
+function addCategory() {
+    const input = document.getElementById('new-category-name');
+    if (!input) return;
+    
+    const name = input.value.trim();
+    if (!name) {
+        alert('Пожалуйста, введите название категории!');
+        return;
+    }
+    
+    const nameExists = Object.values(state.categories).some(c => c.name.toLowerCase() === name.toLowerCase());
+    if (nameExists) {
+        alert('Категория с таким названием уже существует!');
+        return;
+    }
+    
+    const selectedColorEl = document.querySelector('.color-preset-circle.selected');
+    const color = selectedColorEl ? selectedColorEl.dataset.color : 'purple';
+    
+    const id = 'custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+    
+    state.categories[id] = {
+        name: name,
+        color: color,
+        system: false
+    };
+    
+    CATEGORY_MAP[id] = name;
+    
+    input.value = '';
+    
+    saveCustomCategoriesToStorage();
+    
+    renderSettingsCategories();
+    populateCategoryDropdowns();
+    updateUI();
+}
+window.addCategory = addCategory;
+
+function initCategoryColorPicker() {
+    const picker = document.getElementById('category-color-picker');
+    if (!picker) return;
+    
+    const circles = picker.querySelectorAll('.color-preset-circle');
+    circles.forEach(c => {
+        c.addEventListener('click', () => {
+            circles.forEach(other => other.classList.remove('selected'));
+            c.classList.add('selected');
+        });
+    });
+}
+window.initCategoryColorPicker = initCategoryColorPicker;
+
+function deleteCategory(id) {
+    const cat = state.categories[id];
+    if (!cat || cat.system) return;
+    
+    if (confirm(`Вы уверены, что хотите удалить категорию "${cat.name}"? Все расходы и подписки из этой категории будут автоматически перенесены в категорию "Другое" (other).`)) {
+        
+        let modifiedExpenses = false;
+        state.expenses.forEach(exp => {
+            if (exp.category === id) {
+                exp.category = 'other';
+                modifiedExpenses = true;
+                
+                if (state.authMode === 'supabase' && state.currentUser) {
+                    supabaseClient.from('expenses').update({ category: 'other' }).eq('id', exp.id)
+                        .then(({ error }) => { if (error) console.error('Error updating deleted category in Supabase:', error); });
+                }
+            }
+        });
+        
+        delete state.categories[id];
+        delete CATEGORY_MAP[id];
+        
+        saveCustomCategoriesToStorage();
+        if (modifiedExpenses) {
+            saveStateToStorage();
+        }
+        
+        renderSettingsCategories();
+        populateCategoryDropdowns();
+        updateUI();
+    }
+}
+window.deleteCategory = deleteCategory;
+
+function saveCustomCategoriesToStorage() {
+    const custom = {};
+    Object.keys(state.categories).forEach(id => {
+        if (!state.categories[id].system) {
+            custom[id] = state.categories[id];
+        }
+    });
+    localStorage.setItem('finchaos_custom_categories', JSON.stringify(custom));
+}
+window.saveCustomCategoriesToStorage = saveCustomCategoriesToStorage;
+
+// ==========================================================================
+// Lightweight Onboarding Tour Engine
+// ==========================================================================
+let onboardingCurrentStep = 0;
+let onboardingTooltipEl = null;
+
+const ONBOARDING_STEPS = [
+    {
+        target: '#current-month-display',
+        title: 'Выбор месяца',
+        text: 'Кликните по названию месяца, чтобы быстро переключиться на нужный месяц и год.'
+    },
+    {
+        target: '#btn-add-expense',
+        title: 'Добавление расходов',
+        text: 'Создайте вашу первую регулярную подписку или разовый расход здесь.'
+    },
+    {
+        target: '.view-mode-toggle',
+        title: 'Режимы дашборда',
+        text: 'Переключайтесь между списком карточек и календарем платежей.'
+    },
+    {
+        target: '.budget-card',
+        title: 'Управление бюджетом',
+        text: 'Установите лимит расходов на месяц, чтобы отслеживать перерасход.'
+    },
+    {
+        target: '#nav-analytics',
+        title: 'Аналитика и симулятор',
+        text: 'Тут можно рассчитывать годовые расходы и симулировать отключение подписок.'
+    }
+];
+
+function startOnboardingTour() {
+    onboardingCurrentStep = 0;
+    showOnboardingStep(0);
+}
+
+function closeOnboardingTour() {
+    if (onboardingTooltipEl) {
+        onboardingTooltipEl.remove();
+        onboardingTooltipEl = null;
+    }
+    localStorage.setItem('finchaos_onboarding_completed', 'true');
+}
+
+function showOnboardingStep(stepIdx) {
+    if (onboardingTooltipEl) {
+        onboardingTooltipEl.remove();
+        onboardingTooltipEl = null;
+    }
+
+    if (stepIdx >= ONBOARDING_STEPS.length) {
+        closeOnboardingTour();
+        return;
+    }
+
+    onboardingCurrentStep = stepIdx;
+    const step = ONBOARDING_STEPS[stepIdx];
+    const targetEl = document.querySelector(step.target);
+
+    // If target element is not visible or doesn't exist, skip to next
+    if (!targetEl || targetEl.offsetParent === null) {
+        showOnboardingStep(stepIdx + 1);
+        return;
+    }
+
+    // Create tooltip element
+    onboardingTooltipEl = document.createElement('div');
+    onboardingTooltipEl.className = 'onboarding-tooltip arrow-top';
+    
+    onboardingTooltipEl.innerHTML = `
+        <div class="onboarding-tooltip-header">${step.title}</div>
+        <div class="onboarding-tooltip-body">${step.text}</div>
+        <div class="onboarding-tooltip-footer">
+            <span class="onboarding-step-counter">${stepIdx + 1} из ${ONBOARDING_STEPS.length}</span>
+            <div style="display: flex; gap: 8px;">
+                <button type="button" class="onboarding-skip-btn" onclick="closeOnboardingTour()">Пропустить</button>
+                <button type="button" class="onboarding-tooltip-btn" onclick="nextOnboardingStep()">${stepIdx === ONBOARDING_STEPS.length - 1 ? 'Готово' : 'Далее'}</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(onboardingTooltipEl);
+
+    // Position tooltip
+    const rect = targetEl.getBoundingClientRect();
+    const tooltipWidth = onboardingTooltipEl.offsetWidth;
+
+    let top = rect.bottom + window.scrollY + 12;
+    let left = rect.left + window.scrollX;
+
+    // Adjust left if offscreen
+    if (left + tooltipWidth > window.innerWidth) {
+        left = window.innerWidth - tooltipWidth - 16;
+    }
+    if (left < 16) {
+        left = 16;
+    }
+
+    onboardingTooltipEl.style.top = top + 'px';
+    onboardingTooltipEl.style.left = left + 'px';
+}
+
+function nextOnboardingStep() {
+    showOnboardingStep(onboardingCurrentStep + 1);
+}
+
+// ==========================================================================
+// Interactive Stories Playback Engine
+// ==========================================================================
+const STORIES_DATA = [
+    {
+        title: "Автоматические курсы валют",
+        desc: "Мы интегрировали котировки ЦБ РФ! Теперь курсы валют могут обновляться автоматически в фоновом режиме при каждом входе в FinChaos. Больше не нужно вводить значения вручную — просто включите автообновление в настройках.",
+        image: "assets/currency_story.png",
+        ctaText: "Включить автообновление"
+    },
+    {
+        title: "Больше удобных выгрузок",
+        desc: "В настройки перенесен экспорт ICS для календарей. Добавлена долгожданная выгрузка расходов в CSV (полностью оптимизированная под Microsoft Excel на русском языке с UTF-8 BOM и разделителем «;»). А также резервные копии JSON.",
+        image: "assets/data_story.png",
+        ctaText: "Открыть экспорт и импорт"
+    },
+    {
+        title: "Облачная синхронизация",
+        desc: "FinChaos теперь полноценный облачный сервис на базе Supabase! Ваши расходы, лимиты бюджетов и настройки сохраняются в облаке и доступны с любого устройства. При первой регистрации локальные данные переносятся автоматически.",
+        image: "assets/cloud_story.png"
+    }
+];
+
+let activeStoryIndex = 0;
+let storyTimer = null;
+let storyProgress = 0;
+let storyPaused = false;
+const STORY_DURATION = 20000; // 20 seconds per slide
+const STORY_TICK = 50; // Update progress every 50ms
+
+function openStory(index) {
+    activeStoryIndex = index;
+    storyProgress = 0;
+    storyPaused = false;
+    
+    const modal = document.getElementById('story-viewer-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+    }
+    
+    renderStoryBars();
+    loadStoryContent(activeStoryIndex);
+    startStoryTimer();
+}
+
+function closeStory() {
+    stopStoryTimer();
+    const modal = document.getElementById('story-viewer-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+    }
+}
+
+function renderStoryBars() {
+    const container = document.getElementById('story-progress-bars');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    STORIES_DATA.forEach((_, idx) => {
+        const segment = document.createElement('div');
+        segment.className = 'story-progress-segment';
+        
+        const fill = document.createElement('div');
+        fill.className = 'story-progress-fill';
+        fill.id = `story-progress-fill-${idx}`;
+        
+        if (idx < activeStoryIndex) {
+            fill.style.width = '100%';
+        } else {
+            fill.style.width = '0%';
+        }
+        
+        segment.appendChild(fill);
+        container.appendChild(segment);
+    });
+}
+
+function loadStoryContent(index) {
+    const story = STORIES_DATA[index];
+    if (!story) return;
+    
+    const titleEl = document.getElementById('story-viewer-title');
+    const descEl = document.getElementById('story-viewer-desc');
+    const imgContainer = document.getElementById('story-viewer-image');
+    
+    if (titleEl) titleEl.textContent = story.title;
+    if (descEl) descEl.textContent = story.desc;
+    if (imgContainer) {
+        imgContainer.style.backgroundImage = `url('${story.image}')`;
+    }
+    
+    const ctaBtn = document.getElementById('story-viewer-cta');
+    if (ctaBtn) {
+        if (story.ctaText) {
+            ctaBtn.textContent = story.ctaText;
+            ctaBtn.style.display = 'flex';
+        } else {
+            ctaBtn.style.display = 'none';
+        }
+    }
+    
+    updatePauseButtonState(false);
+}
+
+function startStoryTimer() {
+    stopStoryTimer();
+    storyTimer = setInterval(() => {
+        if (!storyPaused) {
+            storyProgress += (STORY_TICK / STORY_DURATION) * 100;
+            if (storyProgress >= 100) {
+                storyProgress = 100;
+                updateProgressBar(activeStoryIndex, 100);
+                nextStory();
+            } else {
+                updateProgressBar(activeStoryIndex, storyProgress);
+            }
+        }
+    }, STORY_TICK);
+}
+
+function stopStoryTimer() {
+    if (storyTimer) {
+        clearInterval(storyTimer);
+        storyTimer = null;
+    }
+}
+
+function updateProgressBar(idx, pct) {
+    const fill = document.getElementById(`story-progress-fill-${idx}`);
+    if (fill) {
+        fill.style.width = `${pct}%`;
+    }
+}
+
+function nextStory() {
+    if (activeStoryIndex < STORIES_DATA.length - 1) {
+        updateProgressBar(activeStoryIndex, 100);
+        activeStoryIndex++;
+        storyProgress = 0;
+        loadStoryContent(activeStoryIndex);
+        renderStoryBars();
+    } else {
+        closeStory();
+    }
+}
+
+function prevStory() {
+    if (storyProgress > 15 || activeStoryIndex === 0) {
+        storyProgress = 0;
+        updateProgressBar(activeStoryIndex, 0);
+    } else {
+        activeStoryIndex--;
+        storyProgress = 0;
+        loadStoryContent(activeStoryIndex);
+        renderStoryBars();
+    }
+}
+
+function toggleStoryPause() {
+    storyPaused = !storyPaused;
+    updatePauseButtonState(storyPaused);
+}
+
+function updatePauseButtonState(paused) {
+    const pauseBtn = document.getElementById('story-pause-btn');
+    if (!pauseBtn) return;
+    
+    if (paused) {
+        pauseBtn.innerHTML = `
+            <svg id="story-pause-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 14px; height: 14px; color: white;">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+        `;
+    } else {
+        pauseBtn.innerHTML = `
+            <svg id="story-pause-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 14px; height: 14px; color: white;">
+                <rect x="6" y="4" width="4" height="16"></rect>
+                <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+        `;
+    }
+}
+
+function setupStoriesHoldListeners() {
+    const storyCardBody = document.getElementById('story-viewer-card-body');
+    if (storyCardBody) {
+        storyCardBody.addEventListener('mousedown', () => {
+            storyPaused = true;
+            updatePauseButtonState(true);
+        });
+        storyCardBody.addEventListener('touchstart', (e) => {
+            storyPaused = true;
+            updatePauseButtonState(true);
+        }, { passive: true });
+        
+        const resumeAction = () => {
+            if (storyPaused) {
+                storyPaused = false;
+                updatePauseButtonState(false);
+            }
+        };
+        
+        storyCardBody.addEventListener('mouseup', resumeAction);
+        storyCardBody.addEventListener('mouseleave', resumeAction);
+        storyCardBody.addEventListener('touchend', resumeAction);
+        storyCardBody.addEventListener('touchcancel', resumeAction);
+    }
+}
+
+function handleStoryCTA() {
+    closeStory();
+    if (activeStoryIndex === 0 || activeStoryIndex === 1) {
+        openSettingsModal();
+    } else if (activeStoryIndex === 2) {
+        if (state.authMode === 'demo') {
+            state.authMode = 'ask';
+            localStorage.setItem('finchaos_auth_mode', 'ask');
+            initAuthUI();
+        } else {
+            openSettingsModal();
+        }
+    }
+}
+
+// Bind to window for global click handlers
+window.closeOnboardingTour = closeOnboardingTour;
+window.nextOnboardingStep = nextOnboardingStep;
+window.startOnboardingTour = startOnboardingTour;
+
+window.openStory = openStory;
+window.closeStory = closeStory;
+window.nextStory = nextStory;
+window.prevStory = prevStory;
+window.toggleStoryPause = toggleStoryPause;
+window.setupStoriesHoldListeners = setupStoriesHoldListeners;
+window.handleStoryCTA = handleStoryCTA;
+
+function initCustomSelects() {
+    const selects = document.querySelectorAll('.select-styled');
+    
+    selects.forEach(select => {
+        if (select.nextElementSibling && select.nextElementSibling.classList.contains('custom-select-container')) {
+            return;
+        }
+        
+        const container = document.createElement('div');
+        container.className = 'custom-select-container';
+        if (select.classList.contains('w-100')) {
+            container.classList.add('w-100');
+        }
+        
+        const trigger = document.createElement('div');
+        trigger.className = 'custom-select-trigger';
+        trigger.setAttribute('tabindex', '0');
+        
+        const triggerText = document.createElement('span');
+        triggerText.className = 'custom-select-trigger-text';
+        
+        const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        chevron.setAttribute('class', 'custom-select-chevron');
+        chevron.setAttribute('viewBox', '0 0 24 24');
+        chevron.setAttribute('fill', 'none');
+        chevron.setAttribute('stroke', 'currentColor');
+        chevron.setAttribute('stroke-width', '2');
+        chevron.setAttribute('stroke-linecap', 'round');
+        chevron.setAttribute('stroke-linejoin', 'round');
+        chevron.innerHTML = '<polyline points="6 9 12 15 18 9"></polyline>';
+        
+        trigger.appendChild(triggerText);
+        trigger.appendChild(chevron);
+        container.appendChild(trigger);
+        
+        const optionsContainer = document.createElement('div');
+        optionsContainer.className = 'custom-select-options';
+        container.appendChild(optionsContainer);
+        
+        select.parentNode.insertBefore(container, select.nextSibling);
+        
+        function renderOptions() {
+            optionsContainer.innerHTML = '';
+            Array.from(select.options).forEach(opt => {
+                const optDiv = document.createElement('div');
+                optDiv.className = 'custom-select-option';
+                optDiv.setAttribute('data-value', opt.value);
+                optDiv.textContent = opt.textContent;
+                
+                if (opt.value === select.value) {
+                    optDiv.classList.add('selected');
+                    triggerText.textContent = opt.textContent;
+                }
+                
+                optDiv.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    select.value = opt.value;
+                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                    closeAllDropdowns();
+                });
+                
+                optionsContainer.appendChild(optDiv);
+            });
+        }
+        
+        renderOptions();
+        
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = container.classList.contains('open');
+            closeAllDropdowns();
+            if (!isOpen) {
+                container.classList.add('open');
+            }
+        });
+        
+        trigger.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                trigger.click();
+            }
+        });
+        
+        const originalDescriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+        if (originalDescriptor && !select.hasOwnProperty('value')) {
+            Object.defineProperty(select, 'value', {
+                get() {
+                    return originalDescriptor.get.call(this);
+                },
+                set(newValue) {
+                    originalDescriptor.set.call(this, newValue);
+                    const option = Array.from(this.options).find(o => o.value === newValue);
+                    if (option) {
+                        triggerText.textContent = option.textContent;
+                        Array.from(optionsContainer.children).forEach(child => {
+                            if (child.getAttribute('data-value') === newValue) {
+                                child.classList.add('selected');
+                            } else {
+                                child.classList.remove('selected');
+                            }
+                        });
+                    }
+                }
+            });
+        }
+
+        const form = select.form;
+        if (form) {
+            form.addEventListener('reset', () => {
+                setTimeout(() => {
+                    const newValue = select.value;
+                    const option = Array.from(select.options).find(o => o.value === newValue);
+                    if (option) {
+                        triggerText.textContent = option.textContent;
+                        Array.from(optionsContainer.children).forEach(child => {
+                            if (child.getAttribute('data-value') === newValue) {
+                                child.classList.add('selected');
+                            } else {
+                                child.classList.remove('selected');
+                            }
+                        });
+                    }
+                }, 0);
+            });
+        }
+    });
+}
+
+function closeAllDropdowns() {
+    document.querySelectorAll('.custom-select-container').forEach(c => {
+        c.classList.remove('open');
+    });
+}
+
+document.addEventListener('click', () => {
+    closeAllDropdowns();
+});
+
+window.initCustomSelects = initCustomSelects;
+window.closeAllDropdowns = closeAllDropdowns;
+
