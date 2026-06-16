@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinChaos — Трекер расходов и подписок</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Main CSS -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Supabase JS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <!-- Auth Screen -->
+    <div id="view-auth" class="auth-view-container hidden">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="brand-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M12 6v12M15 9H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H8"></path>
+                    </svg>
+                </div>
+                <h2 class="auth-brand-name">FinChaos</h2>
+                <p class="auth-subtitle">Управление расходами и подписками в облаке</p>
+            </div>
+
+            <div class="auth-tabs">
+                <button type="button" class="auth-tab active" id="auth-tab-signin">Вход</button>
+                <button type="button" class="auth-tab" id="auth-tab-signup">Регистрация</button>
+            </div>
+
+            <div class="auth-alert hidden" id="auth-alert"></div>
+
+            <form id="auth-form">
+                <div class="form-group">
+                    <label for="auth-email" class="form-label">Email</label>
+                    <input type="email" id="auth-email" class="form-input" placeholder="your@email.com" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="auth-password" class="form-label">Пароль</label>
+                    <input type="password" id="auth-password" class="form-input" placeholder="••••••••" required autocomplete="current-password" minlength="6">
+                </div>
+                <button type="submit" class="btn-primary w-100 justify-content-center" id="auth-submit-btn" style="margin-top: 12px; justify-content: center;">Войти в аккаунт</button>
+            </form>
+
+            <div class="auth-divider">
+                <span>или</span>
+            </div>
+
+            <button type="button" class="btn-secondary w-100 justify-content-center" id="btn-continue-demo" style="justify-content: center;">Продолжить локально (Демо-режим)</button>
+            
+            <p class="auth-footer-text">Все данные в демо-режиме хранятся только в вашем браузере. При последующей регистрации они автоматически перенесутся в облако.</p>
+        </div>
+    </div>
+
+    <div class="app-container hidden">
+        <!-- Sidebar Navigation (Premium clean styling) -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M12 6v12M15 9H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H8"></path>
+                    </svg>
+                </div>
+                <span class="brand-name">FinChaos</span>
+            </div>
+            
+            <nav class="sidebar-menu">
+                <div class="menu-section-title">Главное</div>
+                <a href="#" class="menu-item" id="nav-dashboard">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+                    <span>Дашборд</span>
+                </a>
+                <a href="#" class="menu-item" id="nav-analytics">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    <span>Аналитика</span>
+                </a>
+                <div class="menu-section-title">Управление</div>
+                <a href="#" class="menu-item" id="nav-subscriptions">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    <span>Подписки</span>
+                </a>
+                <div class="menu-section-title">Система</div>
+                <a href="#" class="menu-item" id="nav-settings">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>Настройки</span>
+                </a>
+            </nav>
+
+            <!-- Sidebar widget: Upcoming Payments -->
+            <div class="sidebar-widget" id="upcoming-payments-widget">
+                <h4 class="widget-title">Ближайшие списания</h4>
+                <div class="upcoming-list" id="upcoming-payments-list">
+                    <!-- Dynamically generated list -->
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="user-profile-wrapper" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <div class="user-profile">
+                        <div class="user-avatar" id="user-profile-avatar">FK</div>
+                        <div class="user-info">
+                            <span class="user-name" id="user-profile-name">Финансовый Хаос</span>
+                            <span class="user-role" id="user-profile-role">Личный кабинет</span>
+                        </div>
+                    </div>
+                    <button class="btn-icon" id="btn-logout" title="Выйти из аккаунта" style="display: none; flex-shrink: 0; margin-left: 8px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px;">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            <div class="main-content-inner">
+                <!-- Dashboard View -->
+                <div id="view-dashboard" class="app-view">
+                    <!-- Top Header -->
+            <header class="header">
+                <div class="header-title-wrapper">
+                    <h1>Управление расходами</h1>
+                    <p class="subtitle">Планируйте свои подписки и регулярные платежи</p>
+                </div>
+                
+                <div class="header-actions">
+                    <!-- Month Switcher -->
+                    <div class="month-selector-wrapper" style="position: relative;">
+                        <button class="btn-icon" id="prev-month" title="Предыдущий месяц">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        </button>
+                        <span class="current-month-label" id="current-month-display" style="cursor: pointer; user-select: none;" title="Открыть выбор месяца">Июнь 2026</span>
+                        <button class="btn-icon" id="next-month" title="Следующий месяц">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        </button>
+                        
+                        <!-- Popover Dropdown -->
+                        <div class="month-picker-dropdown hidden" id="month-picker-dropdown">
+                            <div class="month-picker-header">
+                                <button type="button" class="btn-icon picker-year-btn" id="picker-prev-year" title="Предыдущий год">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                                </button>
+                                <span class="picker-year-label" id="picker-year-display">2026</span>
+                                <button type="button" class="btn-icon picker-year-btn" id="picker-next-year" title="Следующий год">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                </button>
+                            </div>
+                            <div class="month-picker-grid" id="month-picker-grid">
+                                <button type="button" class="month-picker-cell" data-month="0">Янв</button>
+                                <button type="button" class="month-picker-cell" data-month="1">Фев</button>
+                                <button type="button" class="month-picker-cell" data-month="2">Мар</button>
+                                <button type="button" class="month-picker-cell" data-month="3">Апр</button>
+                                <button type="button" class="month-picker-cell" data-month="4">Май</button>
+                                <button type="button" class="month-picker-cell" data-month="5">Июн</button>
+                                <button type="button" class="month-picker-cell" data-month="6">Июл</button>
+                                <button type="button" class="month-picker-cell" data-month="7">Авг</button>
+                                <button type="button" class="month-picker-cell" data-month="8">Сен</button>
+                                <button type="button" class="month-picker-cell" data-month="9">Окт</button>
+                                <button type="button" class="month-picker-cell" data-month="10">Ноя</button>
+                                <button type="button" class="month-picker-cell" data-month="11">Дек</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Global Currency Switcher -->
+                    <div class="currency-selector-wrapper">
+                        <label for="global-currency-select" class="currency-label">Валюта:</label>
+                        <select id="global-currency-select" class="select-styled">
+                            <option value="RUB" selected>RUB (₽)</option>
+                            <option value="USD">USD ($)</option>
+                            <option value="EUR">EUR (€)</option>
+                        </select>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Stats Overview Cards -->
+            <section class="stats-grid">
+                <!-- Total Planned Card -->
+                <div class="stat-card">
+                    <div class="stat-card-header">
+                        <span class="stat-card-title">Всего расходов</span>
+                        <div class="stat-icon spent-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                        </div>
+                    </div>
+                    <div class="stat-card-value" id="total-planned-value">0 ₽</div>
+                    <div class="planned-breakdown-row" style="display: flex; gap: 16px; margin-top: 4px; font-size: 13px; font-weight: 500;">
+                        <span class="breakdown-paid" style="color: var(--success-text); display: flex; align-items: center; gap: 6px;">
+                            <span style="width: 6px; height: 6px; border-radius: 50%; background-color: var(--success); display: inline-block;"></span>
+                            <span>Оплачено: <strong id="total-paid-sub">0 ₽</strong></span>
+                        </span>
+                        <span class="breakdown-pending" style="color: var(--warning-text); display: flex; align-items: center; gap: 6px;">
+                            <span style="width: 6px; height: 6px; border-radius: 50%; background-color: var(--warning); display: inline-block;"></span>
+                            <span>Ожидает: <strong id="total-pending-sub">0 ₽</strong></span>
+                        </span>
+                    </div>
+                    <div class="stat-card-sub-row" style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; flex-wrap: wrap; gap: 6px; border-top: 1px dashed var(--border-color); padding-top: 10px;">
+                        <span class="stat-card-sub" style="margin-top: 0; font-size: 12px; color: var(--text-muted);">по сравнению с прошлым месяцем</span>
+                        <span class="trend-badge" id="mom-trend-badge"></span>
+                    </div>
+                </div>
+
+                <!-- Monthly Budget Card -->
+                <div class="stat-card budget-card">
+                    <div class="stat-card-header">
+                        <span class="stat-card-title">Месячный бюджет</span>
+                        <button class="btn-text-action" id="btn-edit-budget">Изменить</button>
+                    </div>
+                    <div class="stat-card-value" id="budget-limit-value">0 ₽</div>
+                    <div class="budget-progress-container">
+                        <div class="budget-progress-bar">
+                            <div class="budget-progress-fill-spent" id="budget-progress-fill-spent" style="width: 0%"></div>
+                            <div class="budget-progress-fill-pending" id="budget-progress-fill-pending" style="width: 0%"></div>
+                        </div>
+                        <div class="budget-progress-stats">
+                            <span id="budget-progress-percent">0% использовано</span>
+                            <span id="budget-remaining-value">Осталось: 0 ₽</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Summary Card (Donut Chart) -->
+                <div class="stat-card chart-card">
+                    <div class="stat-card-header">
+                        <span class="stat-card-title">Разделы трат</span>
+                        <div class="chart-view-toggle">
+                            <button type="button" class="view-toggle-btn active" id="chart-toggle-all">Всего</button>
+                            <button type="button" class="view-toggle-btn" id="chart-toggle-paid">Оплачено</button>
+                        </div>
+                    </div>
+                    <div class="chart-content-wrapper">
+                        <div class="donut-chart-container">
+                            <svg width="68" height="68" viewBox="0 0 42 42" class="donut-chart" id="category-donut-chart">
+                                <circle class="donut-hole" cx="21" cy="21" r="15.915" fill="#fff"></circle>
+                                <circle class="donut-ring" cx="21" cy="21" r="15.915" fill="transparent" stroke="#f1f5f9" stroke-width="4.5"></circle>
+                                <!-- Segments inserted dynamically -->
+                            </svg>
+                            <div class="donut-chart-label" id="donut-chart-center-label">0%</div>
+                        </div>
+                        <div class="chart-legend" id="category-chart-legend">
+                            <!-- Legend items -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Dashboard Content -->
+            <section class="dashboard-content">
+                <!-- Filters and Add Section -->
+                <div class="content-controls">
+                    <div class="search-filter-group">
+                        <div class="search-wrapper">
+                            <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input type="text" id="search-input" placeholder="Поиск по названию или описанию...">
+                        </div>
+                        
+                        <div class="filter-select-wrapper">
+                            <select id="category-filter" class="select-styled">
+                                <option value="all">Все категории</option>
+                                <option value="software">Софт / Инструменты</option>
+                                <option value="entertainment">Развлечения / Медиа</option>
+                                <option value="work">Работа / Проекты</option>
+                                <option value="utilities">Связь и хостинг</option>
+                                <option value="other">Другое</option>
+                            </select>
+                        </div>
+
+                        <div class="filter-select-wrapper">
+                            <select id="sort-by-select" class="select-styled">
+                                <option value="date-asc" selected>По дате (ближайшие)</option>
+                                <option value="date-desc">По дате (поздние)</option>
+                                <option value="price-desc">По стоимости (убывание)</option>
+                                <option value="price-asc">По стоимости (возрастание)</option>
+                                <option value="name-asc">По названию (А-Я)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="hide-paid-wrapper" style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--text-secondary); user-select: none; white-space: nowrap; margin-left: 4px;">
+                            <span>Скрыть оплаченные</span>
+                            <label class="switch">
+                                <input type="checkbox" id="hide-paid-toggle">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-display-options">
+                        <div class="view-mode-toggle">
+                            <button type="button" class="view-toggle-btn active" id="view-toggle-cards" title="Вид карточек">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                                <span>Карточки</span>
+                            </button>
+                            <button type="button" class="view-toggle-btn" id="view-toggle-calendar" title="Вид календаря">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                <span>Календарь</span>
+                            </button>
+                        </div>
+                        <button class="btn-secondary" id="btn-export-ics" title="Экспорт подписок в .ics файл" style="display: flex; align-items: center; gap: 6px; height: 42px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            <span>Экспорт .ics</span>
+                        </button>
+                    </div>
+                    
+                    <button class="btn-primary" id="btn-add-expense">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        <span>Добавить трату</span>
+                    </button>
+                </div>
+
+                <!-- Empty State -->
+                <div class="empty-state hidden" id="empty-state-view">
+                    <div class="empty-state-illustration">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                    </div>
+                    <h3>Ничего не найдено</h3>
+                    <p>Попробуйте сбросить фильтры или добавьте новую трату в этот месяц.</p>
+                </div>
+
+                <!-- Expenses Grid -->
+                <div class="expenses-grid" id="expenses-grid">
+                    <!-- Cards will be dynamically inserted here -->
+                </div>
+
+                <!-- Expenses Calendar View -->
+                <div class="expenses-calendar-view hidden" id="expenses-calendar-view">
+                    <div class="calendar-grid-header">
+                        <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
+                    </div>
+                    <div class="calendar-grid-body" id="calendar-grid-body">
+                        <!-- Cells rendered dynamically in app.js -->
+                    </div>
+                </div>
+            </section>
+            </div> <!-- End view-dashboard -->
+
+            <!-- Analytics View -->
+            <div id="view-analytics" class="app-view hidden">
+                <header class="header">
+                    <div class="header-title-wrapper">
+                        <h1>Аналитика расходов</h1>
+                        <p class="subtitle">Прогнозирование трат и симулятор оптимизации бюджета</p>
+                    </div>
+                </header>
+
+                <!-- Analytics Stats Cards -->
+                <div class="stats-grid">
+                    <!-- Forecast Card -->
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-card-title">Годовой прогноз расходов</span>
+                            <div class="stat-icon spent-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                            </div>
+                        </div>
+                        <div class="stat-card-value" id="analytics-annual-forecast">0 ₽</div>
+                        <span class="stat-card-sub">на основе текущих активных подписок за 12 месяцев</span>
+                    </div>
+
+                    <!-- Monthly Forecast Card -->
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <span class="stat-card-title">Средний расход в месяц</span>
+                            <div class="stat-icon stats-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                            </div>
+                        </div>
+                        <div class="stat-card-value" id="analytics-monthly-average">0 ₽</div>
+                        <span class="stat-card-sub">сумма всех активных подписок и трат за месяц</span>
+                    </div>
+
+                    <!-- Savings Potential Card -->
+                    <div class="stat-card" style="border-color: var(--primary); background-color: var(--primary-glow);">
+                        <div class="stat-card-header">
+                            <span class="stat-card-title" style="color: var(--primary-hover);">Потенциал экономии</span>
+                            <div class="stat-icon" style="background-color: var(--bg-card); color: var(--primary-hover); border: 1px solid rgba(132, 204, 22, 0.15);">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"></line><circle cx="6.5" cy="6.5" r="2.5"></circle><circle cx="17.5" cy="17.5" r="2.5"></circle></svg>
+                            </div>
+                        </div>
+                        <div class="stat-card-value" id="analytics-savings-potential" style="color: var(--text-primary);">0 ₽</div>
+                        <span class="stat-card-sub" style="color: var(--text-secondary);">вы можете сэкономить в год, отключив выбранные услуги</span>
+                    </div>
+                </div>
+
+                <!-- Two Column Layout: Simulator & Currency Analysis -->
+                <div class="analytics-layout">
+                    <!-- Savings Simulator Card -->
+                    <div class="table-card" style="margin-top: 0;">
+                        <h3 style="font-size: 18px; margin-bottom: 8px;">Интерактивный симулятор «Что если?»</h3>
+                        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">
+                            Отметьте подписки, которые вы готовы отключить, чтобы увидеть мгновенный пересчет годовой и месячной экономии.
+                        </p>
+                        
+                        <div class="simulator-list" id="simulator-list">
+                            <!-- Active subscriptions checkboxes go here -->
+                        </div>
+
+                        <!-- Simulator Totals -->
+                        <div class="simulator-summary">
+                            <div class="sim-saved-group">
+                                <div>
+                                    <div class="sim-label">Снижение за месяц:</div>
+                                    <div class="sim-value-saved" id="sim-monthly-saved">0 ₽</div>
+                                </div>
+                                <div>
+                                    <div class="sim-label">Снижение за год:</div>
+                                    <div class="sim-value-saved" id="sim-annual-saved">0 ₽</div>
+                                </div>
+                            </div>
+                            <div class="sim-new-total-group">
+                                <div class="sim-label">Новый годовой прогноз:</div>
+                                <div class="sim-value-total" id="sim-new-annual-total">0 ₽</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Currency Distribution Card -->
+                    <div class="table-card" style="margin-top: 0; display: flex; flex-direction: column;">
+                        <h3 style="font-size: 18px; margin-bottom: 8px;">Распределение расходов по валютам</h3>
+                        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">
+                            Доля регулярных трат в разрезе валют платежа (с учетом текущих курсов).
+                        </p>
+                        
+                        <div class="currency-distribution-container" id="currency-distribution-list">
+                            <!-- Dynamic currency bars -->
+                        </div>
+                        
+                        <!-- Currency Rates Info -->
+                        <div class="currency-rates-info">
+                            Используемые курсы: 1 USD = <span id="rate-usd-display">0</span> ₽, 1 EUR = <span id="rate-eur-display">0</span> ₽
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Subscriptions Table View -->
+            <div id="view-subscriptions" class="app-view hidden">
+                <!-- Subscriptions Header -->
+                <header class="header">
+                    <div class="header-title-wrapper">
+                        <h1>Мои подписки</h1>
+                        <p class="subtitle">Управление повторяющимися расходами и шаблонами списаний</p>
+                    </div>
+                    <button class="btn-primary" id="btn-add-subscription-tab">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        <span>Добавить подписку</span>
+                    </button>
+                </header>
+
+                <!-- Subscriptions Table Card -->
+                <div class="table-card">
+                    <div class="table-controls">
+                        <div class="search-wrapper" style="max-width: 420px; width: 100%;">
+                            <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input type="text" id="sub-search-input" placeholder="Поиск по названию или описанию подписки...">
+                        </div>
+                        <div class="filter-select-wrapper">
+                            <select id="sub-category-filter" class="select-styled">
+                                <option value="all">Все категории</option>
+                                <option value="software">Софт / Инструменты</option>
+                                <option value="entertainment">Развлечения / Медиа</option>
+                                <option value="work">Работа / Проекты</option>
+                                <option value="utilities">Связь и хостинг</option>
+                                <option value="other">Другое</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="subscriptions-table">
+                            <thead>
+                                <tr>
+                                    <th>Название</th>
+                                    <th>Категория</th>
+                                    <th>Период</th>
+                                    <th>Стоимость</th>
+                                    <th>Статус</th>
+                                    <th style="text-align: right;">Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="subscriptions-table-body">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Empty State for Table -->
+                    <div class="empty-state hidden" id="sub-table-empty-view" style="border: none; background: transparent; padding: 48px 24px;">
+                        <div class="empty-state-illustration" style="width: 48px; height: 48px; margin-bottom: 12px; color: var(--text-muted);">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                        </div>
+                        <h3 style="font-size: 16px; margin-bottom: 6px;">Подписок не найдено</h3>
+                        <p style="font-size: 13px; max-width: 320px; color: var(--text-secondary); margin: 0 auto;">Добавьте новую регулярную подписку с помощью кнопки выше.</p>
+                    </div>
+                </div>
+            </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal: Add / Edit Expense -->
+    <div class="modal-overlay" id="expense-modal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 id="modal-title">Новая подписка/покупка</h2>
+                <button class="modal-close" id="modal-close-btn">&times;</button>
+            </div>
+            <form id="expense-form" class="modal-body">
+                <input type="hidden" id="expense-id">
+                
+                <div class="form-group">
+                    <label for="expense-name" class="form-label">Название трат</label>
+                    <input type="text" id="expense-name" class="form-input" placeholder="Например: Adobe Creative Cloud, Netflix, Figma..." required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Тип расхода</label>
+                    <div class="form-type-selector">
+                        <label class="type-option">
+                            <input type="radio" name="expense-type" value="subscription" checked>
+                            <span>Подписка</span>
+                        </label>
+                        <label class="type-option">
+                            <input type="radio" name="expense-type" value="one-time">
+                            <span>Разовая покупка</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" id="subscription-period-group">
+                    <label for="expense-period" class="form-label">Периодичность оплаты</label>
+                    <select id="expense-period" class="select-styled w-100">
+                        <option value="monthly" selected>Ежемесячно</option>
+                        <option value="quarterly">Раз в 3 месяца (Квартально)</option>
+                        <option value="semi-annually">Раз в 6 месяцев (Полгода)</option>
+                        <option value="annually">Раз в год (Ежегодно)</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group flex-2">
+                        <label for="expense-amount" class="form-label">Сумма</label>
+                        <input type="number" id="expense-amount" class="form-input" placeholder="2999" min="0" step="any" required>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label for="expense-currency" class="form-label">Валюта</label>
+                        <select id="expense-currency" class="select-styled w-100">
+                            <option value="RUB">RUB (₽)</option>
+                            <option value="USD">USD ($)</option>
+                            <option value="EUR">EUR (€)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="expense-category" class="form-label">Категория</label>
+                        <select id="expense-category" class="select-styled w-100">
+                            <option value="software">Софт / Инструменты</option>
+                            <option value="entertainment">Развлечения / Медиа</option>
+                            <option value="work">Работа / Проекты</option>
+                            <option value="utilities">Связь и хостинг</option>
+                            <option value="other">Другое</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="expense-date" class="form-label">Дата платежа</label>
+                        <input type="date" id="expense-date" class="form-input" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="expense-link" class="form-label">Ссылка для оплаты/покупки (необязательно)</label>
+                    <input type="url" id="expense-link" class="form-input" placeholder="https://adobe.com/ru/...">
+                </div>
+
+                <div class="form-group">
+                    <label for="expense-comment" class="form-label">Комментарий для себя</label>
+                    <textarea id="expense-comment" class="form-input text-area" rows="3" placeholder="Дополнительная информация, промокоды, инструкции по оплате..."></textarea>
+                </div>
+
+                <div class="form-group" id="propagate-sub-changes-group" style="flex-direction: row; align-items: center; gap: 8px; margin-top: 4px;">
+                    <label class="switch">
+                        <input type="checkbox" id="propagate-sub-changes" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <label for="propagate-sub-changes" class="form-label" style="cursor: pointer; margin-bottom: 0; font-size: 13px; font-weight: 500; color: var(--text-secondary);">Синхронизировать изменения во всех месяцах</label>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="btn-cancel-expense">Отмена</button>
+                    <button type="submit" class="btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Monthly Budget -->
+    <div class="modal-overlay" id="budget-modal">
+        <div class="modal-container modal-small">
+            <div class="modal-header">
+                <h2>Изменить месячный бюджет</h2>
+                <button class="modal-close" id="budget-modal-close-btn">&times;</button>
+            </div>
+            <form id="budget-form" class="modal-body">
+                <div class="form-group">
+                    <label for="budget-limit-input" class="form-label">Лимит трат на выбранный месяц</label>
+                    <div class="budget-input-wrapper">
+                        <input type="number" id="budget-limit-input" class="form-input" placeholder="Например: 50000" min="0" required>
+                        <span class="budget-currency-symbol" id="budget-currency-label">₽</span>
+                    </div>
+                    <span class="form-hint">Задайте максимальную сумму расходов. Шкала бюджета будет автоматически пересчитываться в глобальной валюте.</span>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="btn-cancel-budget">Отмена</button>
+                    <button type="submit" class="btn-primary">Сохранить бюджет</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <!-- Modal: Confirm Delete Subscription -->
+    <div class="modal-overlay" id="delete-confirm-modal">
+        <div class="modal-container modal-small">
+            <div class="modal-header">
+                <h2>Удаление подписки</h2>
+                <button class="modal-close" id="delete-modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 8px;">Вы хотите удалить эту подписку полностью из всех месяцев или только платеж в текущем месяце?</p>
+                <div class="modal-footer" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                    <button type="button" class="btn-primary w-100" id="btn-delete-all" style="background-color: var(--danger); box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15); justify-content: center;">Удалить всю подписку везде</button>
+                    <button type="button" class="btn-secondary w-100" id="btn-delete-current" style="justify-content: center;">Удалить только в этом месяце</button>
+                    <button type="button" class="btn-secondary w-100" id="btn-cancel-delete" style="justify-content: center;">Отмена</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Settings -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2>Настройки системы</h2>
+                <button class="modal-close" id="settings-modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Exchange Rates -->
+                <div class="settings-section">
+                    <h3 class="settings-section-title" style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;">Курсы валют (в рублях)</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="rate-usd-input" class="form-label">Курс USD ($)</label>
+                            <input type="number" id="rate-usd-input" class="form-input" min="1" step="any" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="rate-eur-input" class="form-label">Курс EUR (€)</label>
+                            <input type="number" id="rate-eur-input" class="form-input" min="1" step="any" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr style="border: none; border-top: 1px solid var(--border-color); margin: 8px 0;">
+                
+                <!-- Backup & Restore -->
+                <div class="settings-section">
+                    <h3 class="settings-section-title" style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">Резервное копирование</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Выгружайте свои данные в файл или восстанавливайте их из бэкапа.</p>
+                    <div class="form-row" style="gap: 12px;">
+                        <button type="button" class="btn-secondary flex-1" id="btn-export-data" style="justify-content: center; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            <span>Экспорт</span>
+                        </button>
+                        <button type="button" class="btn-secondary flex-1" id="btn-trigger-import" style="justify-content: center; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            <span>Импорт</span>
+                        </button>
+                        <input type="file" id="import-file-input" style="display: none;" accept=".json">
+                    </div>
+                </div>
+                <div class="modal-footer" style="padding-top: 12px;">
+                    <button type="button" class="btn-primary w-100" id="btn-save-settings" style="justify-content: center;">Сохранить настройки</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Core App Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
