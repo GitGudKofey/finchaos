@@ -8,6 +8,110 @@ const SUPABASE_URL = (window.location.hostname === 'localhost' || window.locatio
     : `${window.location.origin}/api/supabase`;
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvZXJmY3hyd3ptZWpzendzaXBsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1ODgzODYsImV4cCI6MjA5NzE2NDM4Nn0.ixNlHSlkn7eS1x42lhb5oKoYKAN8Xx8jsl8loa1qh7s"; // Please insert your Supabase Anon Key here
 
+// ==========================================================================
+// Toast Notification System (Sleek custom alerts)
+// ==========================================================================
+function showToast(message, type = 'success', duration = 4000) {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast-notification toast-${type}`;
+
+    let iconHTML = '';
+    if (type === 'success') {
+        iconHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
+    } else if (type === 'error') {
+        iconHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>`;
+    } else if (type === 'warning') {
+        iconHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+    } else if (type === 'loading') {
+        iconHTML = `<div class="toast-spinner"></div>`;
+    } else {
+        iconHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+    }
+
+    toast.innerHTML = `
+        <div class="toast-icon">${iconHTML}</div>
+        <div class="toast-content">${message}</div>
+        <button type="button" class="toast-close-btn">&times;</button>
+    `;
+
+    container.appendChild(toast);
+
+    const closeBtn = toast.querySelector('.toast-close-btn');
+    let dismissTimeout;
+    
+    const dismiss = () => {
+        if (toast.classList.contains('hide')) return;
+        if (dismissTimeout) clearTimeout(dismissTimeout);
+        toast.classList.add('hide');
+        toast.addEventListener('animationend', () => {
+            toast.remove();
+            const activeContainer = document.getElementById('toast-container');
+            if (activeContainer && activeContainer.children.length === 0) {
+                activeContainer.remove();
+            }
+        });
+    };
+
+    closeBtn.addEventListener('click', dismiss);
+
+    if (duration > 0) {
+        dismissTimeout = setTimeout(dismiss, duration);
+    }
+
+    return {
+        dismiss,
+        update: (newMessage, newType = 'success', newDuration = 4000) => {
+            toast.querySelector('.toast-content').textContent = newMessage;
+            toast.className = `toast-notification toast-${newType}`;
+            
+            let newIconHTML = '';
+            if (newType === 'success') {
+                newIconHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
+            } else if (newType === 'error') {
+                newIconHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>`;
+            } else if (newType === 'warning') {
+                newIconHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+            } else if (newType === 'loading') {
+                newIconHTML = `<div class="toast-spinner"></div>`;
+            } else {
+                newIconHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+            }
+            toast.querySelector('.toast-icon').innerHTML = newIconHTML;
+
+            if (dismissTimeout) clearTimeout(dismissTimeout);
+            if (newDuration > 0) {
+                dismissTimeout = setTimeout(dismiss, newDuration);
+            }
+        }
+    };
+}
+window.showToast = showToast;
+
+// Override alert as fallback
+window.alert = function(message) {
+    if (message === null || message === undefined) return;
+    const msgStr = String(message);
+    const msgLower = msgStr.toLowerCase();
+    let type = 'info';
+    
+    // Check keywords to find best semantic category
+    if (msgLower.includes('успешно') || msgLower.includes('сохранен') || msgLower.includes('импортирован') || msgLower.includes('успешный')) {
+        type = 'success';
+    } else if (msgLower.includes('ошибка') || msgLower.includes('некоррект') || msgLower.includes('не удалось') || msgLower.includes('не может быть') || msgLower.includes('введите')) {
+        type = 'error';
+    } else if (msgLower.includes('пожалуйста') || msgLower.includes('у вас нет')) {
+        type = 'warning';
+    }
+    showToast(msgStr, type);
+};
+
 // Default Currency rates relative to RUB (Russian Ruble) if not set in storage
 const DEFAULT_RATES = {
     USD: 90,
@@ -58,7 +162,10 @@ let state = {
     dashboardViewMode: 'cards', // 'cards' vs 'calendar'
     // Temporary target trackers for deletion
     deleteTargetId: null,
-    deleteTargetSubId: null
+    deleteTargetSubId: null,
+    wallets: [],
+    theme: 'system',
+    profileName: ''
 };
 
 // ==========================================================================
@@ -122,7 +229,7 @@ async function checkUserSession() {
 function initAuthUI() {
     const viewAuth = document.getElementById('view-auth');
     const appContainer = document.querySelector('.app-container');
-    const logoutBtn = document.getElementById('btn-logout');
+    const logoutBtn = document.getElementById('popover-btn-logout');
 
     const alertEl = document.getElementById('auth-alert');
     if (alertEl && SUPABASE_ANON_KEY === "YOUR_SUPABASE_ANON_KEY_HERE") {
@@ -131,23 +238,41 @@ function initAuthUI() {
         alertEl.classList.remove('hidden');
     }
 
+    // Load custom profile name if saved
+    const storedName = localStorage.getItem('finchaos_username');
+    state.profileName = storedName || '';
+
+    // Initialize Theme
+    const savedTheme = localStorage.getItem('finchaos_theme') || 'system';
+    setTheme(savedTheme);
+
     if (state.authMode === 'supabase' && state.currentUser) {
         if (viewAuth) viewAuth.classList.add('hidden');
         if (appContainer) appContainer.classList.remove('hidden');
         if (logoutBtn) {
-            logoutBtn.style.display = 'flex';
             logoutBtn.title = `Выйти (${state.currentUser.email})`;
         }
 
         const userNameEl = document.getElementById('user-profile-name');
         const userRoleEl = document.getElementById('user-profile-role');
         const userAvatarEl = document.getElementById('user-profile-avatar');
-        if (userNameEl) userNameEl.textContent = state.currentUser.email.split('@')[0];
+        
+        const finalName = state.profileName || state.currentUser.email.split('@')[0];
+        if (userNameEl) userNameEl.textContent = finalName;
         if (userRoleEl) userRoleEl.textContent = 'Облачный аккаунт';
-        if (userAvatarEl) userAvatarEl.textContent = getInitials(state.currentUser.email.split('@')[0] || 'Cloud');
+        if (userAvatarEl) {
+            const parts = finalName.trim().split(/\s+/);
+            let initials = '';
+            if (parts.length > 0) {
+                if (parts[0]) initials += parts[0][0].toUpperCase();
+                if (parts[1]) initials += parts[1][0].toUpperCase();
+            }
+            userAvatarEl.textContent = initials || 'DM';
+        }
 
         loadStateFromSupabase().then(() => {
             updateUI();
+            renderPopoverWallets();
             if (!localStorage.getItem('finchaos_onboarding_completed')) {
                 setTimeout(() => startOnboardingTour(), 1500);
             }
@@ -156,19 +281,29 @@ function initAuthUI() {
         if (viewAuth) viewAuth.classList.add('hidden');
         if (appContainer) appContainer.classList.remove('hidden');
         if (logoutBtn) {
-            logoutBtn.style.display = 'flex';
             logoutBtn.title = "Вернуться к авторизации";
         }
 
         const userNameEl = document.getElementById('user-profile-name');
         const userRoleEl = document.getElementById('user-profile-role');
         const userAvatarEl = document.getElementById('user-profile-avatar');
-        if (userNameEl) userNameEl.textContent = 'Демо-пользователь';
+        
+        const finalName = state.profileName || 'Демо-пользователь';
+        if (userNameEl) userNameEl.textContent = finalName;
         if (userRoleEl) userRoleEl.textContent = 'Локальное хранилище';
-        if (userAvatarEl) userAvatarEl.textContent = 'DM';
+        if (userAvatarEl) {
+            const parts = finalName.trim().split(/\s+/);
+            let initials = '';
+            if (parts.length > 0) {
+                if (parts[0]) initials += parts[0][0].toUpperCase();
+                if (parts[1]) initials += parts[1][0].toUpperCase();
+            }
+            userAvatarEl.textContent = initials || 'DM';
+        }
 
         loadStateFromStorage();
         updateUI();
+        renderPopoverWallets();
         if (!localStorage.getItem('finchaos_onboarding_completed')) {
             setTimeout(() => startOnboardingTour(), 1500);
         }
@@ -500,6 +635,9 @@ function loadStateFromStorage() {
     const storedRates = localStorage.getItem('finchaos_rates');
     const storedChartMode = localStorage.getItem('finchaos_chart_mode');
     const storedViewMode = localStorage.getItem('finchaos_view_mode');
+    const storedWallets = localStorage.getItem('finchaos_wallets');
+    const storedTheme = localStorage.getItem('finchaos_theme');
+    const storedUsername = localStorage.getItem('finchaos_username');
 
     if (storedCurrency) {
         state.globalCurrency = storedCurrency;
@@ -523,6 +661,18 @@ function loadStateFromStorage() {
     } else {
         state.rates = { ...DEFAULT_RATES };
     }
+
+    if (storedWallets) {
+        state.wallets = JSON.parse(storedWallets);
+    } else {
+        state.wallets = [
+            { id: 'wallet-1', name: 'Карта Tinkoff', balance: 25000, currency: 'RUB' },
+            { id: 'wallet-2', name: 'Наличные', balance: 3500, currency: 'RUB' }
+        ];
+    }
+
+    state.theme = storedTheme || 'system';
+    state.profileName = storedUsername || '';
 
     if (storedExpenses) {
         state.expenses = JSON.parse(storedExpenses);
@@ -573,6 +723,9 @@ function saveStateToStorage() {
     }
     localStorage.setItem('finchaos_chart_mode', state.chartMode);
     localStorage.setItem('finchaos_view_mode', state.dashboardViewMode);
+    localStorage.setItem('finchaos_wallets', JSON.stringify(state.wallets));
+    localStorage.setItem('finchaos_theme', state.theme);
+    localStorage.setItem('finchaos_username', state.profileName);
 }
 
 function generateDemoData() {
@@ -1682,6 +1835,7 @@ function initEventListeners() {
         }
         saveStateToStorage();
         updateUI();
+        renderPopoverWallets();
     });
 
     // Search, Category, and Sort filtering
@@ -1733,6 +1887,32 @@ function initEventListeners() {
         saveExpenseForm();
     });
 
+    // Modal action buttons click events (Delete and Pause/Resume)
+    const modalDeleteBtn = document.getElementById('modal-btn-delete');
+    if (modalDeleteBtn) {
+        modalDeleteBtn.addEventListener('click', () => {
+            const id = document.getElementById('expense-id').value;
+            if (id) {
+                closeExpenseModal();
+                deleteExpense(id);
+            }
+        });
+    }
+
+    const modalToggleActiveBtn = document.getElementById('modal-btn-toggle-active');
+    if (modalToggleActiveBtn) {
+        modalToggleActiveBtn.addEventListener('click', () => {
+            const id = document.getElementById('expense-id').value;
+            if (id) {
+                const expense = state.expenses.find(e => e.id === id);
+                if (expense) {
+                    closeExpenseModal();
+                    toggleActiveStatus(id, !expense.active);
+                }
+            }
+        });
+    }
+
     // Budget modal triggers
     document.getElementById('btn-edit-budget').addEventListener('click', openBudgetModal);
     document.getElementById('budget-modal-close-btn').addEventListener('click', closeBudgetModal);
@@ -1761,31 +1941,66 @@ function initEventListeners() {
         executeDeleteCurrent();
     });
 
-    // Settings Modal Triggers
+    // Settings Tab Trigger
     document.getElementById('nav-settings').addEventListener('click', (e) => {
         e.preventDefault();
-        openSettingsModal();
-    });
-    document.getElementById('settings-modal-close-btn').addEventListener('click', closeSettingsModal);
-    document.getElementById('settings-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'settings-modal') closeSettingsModal();
+        switchTab('profile');
     });
 
-    // Settings logic (save rates)
-    document.getElementById('btn-save-settings').addEventListener('click', () => {
-        saveSettingsForm();
-    });
+    // Save rates listener
+    const saveRatesBtn = document.getElementById('btn-save-rates-new');
+    if (saveRatesBtn) {
+        saveRatesBtn.addEventListener('click', () => {
+            saveSettingsFormNew();
+        });
+    }
 
-    // Settings backup triggers
-    document.getElementById('btn-export-data').addEventListener('click', () => {
-        exportData();
-    });
-    document.getElementById('btn-trigger-import').addEventListener('click', () => {
-        document.getElementById('import-file-input').click();
-    });
-    document.getElementById('import-file-input').addEventListener('change', (e) => {
-        importData(e);
-    });
+    // Auto-update checkbox toggle listener
+    const autoUpdateCheckboxNew = document.getElementById('rates-auto-update-input-new');
+    if (autoUpdateCheckboxNew) {
+        autoUpdateCheckboxNew.addEventListener('change', () => {
+            syncRatesInputStateNew();
+        });
+    }
+
+    // Save username listener
+    const saveUsernameBtn = document.getElementById('btn-save-username');
+    if (saveUsernameBtn) {
+        saveUsernameBtn.addEventListener('click', () => {
+            const newName = document.getElementById('profile-username-input').value;
+            updateProfileName(newName);
+        });
+    }
+
+    // Notification switch listener
+    const newsCheckbox = document.getElementById('profile-notif-news');
+    if (newsCheckbox) {
+        newsCheckbox.addEventListener('change', (e) => {
+            localStorage.setItem('finchaos_notif_news', e.target.checked ? 'true' : 'false');
+        });
+    }
+
+    // Settings backup triggers (New full-screen tab)
+    const exportDataNewBtn = document.getElementById('btn-export-data-new');
+    if (exportDataNewBtn) {
+        exportDataNewBtn.addEventListener('click', () => {
+            exportData();
+        });
+    }
+
+    const triggerImportNewBtn = document.getElementById('btn-trigger-import-new');
+    if (triggerImportNewBtn) {
+        triggerImportNewBtn.addEventListener('click', () => {
+            document.getElementById('import-file-input-new').click();
+        });
+    }
+
+    const importFileInputNew = document.getElementById('import-file-input-new');
+    if (importFileInputNew) {
+        importFileInputNew.addEventListener('change', (e) => {
+            importData(e);
+        });
+    }
 
     // Tab switching event listeners
     document.getElementById('nav-dashboard').addEventListener('click', (e) => {
@@ -1818,7 +2033,7 @@ function initEventListeners() {
     }
 
     // ICS Export button listener
-    const exportIcsBtn = document.getElementById('btn-export-ics');
+    const exportIcsBtn = document.getElementById('btn-export-ics-new');
     if (exportIcsBtn) {
         exportIcsBtn.addEventListener('click', () => {
             exportToICS();
@@ -1826,7 +2041,7 @@ function initEventListeners() {
     }
 
     // CSV Export button listener
-    const exportCsvBtn = document.getElementById('btn-export-csv');
+    const exportCsvBtn = document.getElementById('btn-export-csv-new');
     if (exportCsvBtn) {
         exportCsvBtn.addEventListener('click', () => {
             exportToCSV();
@@ -1834,10 +2049,9 @@ function initEventListeners() {
     }
 
     // Start Tour button listener
-    const startTourBtn = document.getElementById('btn-start-tour');
+    const startTourBtn = document.getElementById('btn-start-tour-new');
     if (startTourBtn) {
         startTourBtn.addEventListener('click', () => {
-            closeSettingsModal();
             startOnboardingTour();
         });
     }
@@ -1854,7 +2068,7 @@ function initEventListeners() {
         renderSubscriptionsTable();
     });
 
-    const logoutBtn = document.getElementById('btn-logout');
+    const logoutBtn = document.getElementById('popover-btn-logout');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
             if (state.authMode === 'supabase' && supabaseClient) {
@@ -1871,23 +2085,97 @@ function initEventListeners() {
         });
     }
 
-    const autoUpdateCheckbox = document.getElementById('rates-auto-update-input');
-    if (autoUpdateCheckbox) {
-        autoUpdateCheckbox.addEventListener('change', syncRatesInputState);
+    // NEW: Popover Trigger Button
+    const triggerBtn = document.getElementById('user-profile-trigger-btn');
+    const popover = document.getElementById('user-profile-popover');
+    if (triggerBtn && popover) {
+        triggerBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isHidden = popover.classList.toggle('hidden');
+            triggerBtn.classList.toggle('active', !isHidden);
+        });
+
+        popover.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
     }
 
-    const btnAddCategory = document.getElementById('btn-add-category');
-    if (btnAddCategory) {
-        btnAddCategory.addEventListener('click', addCategory);
+    // Close popover when clicking outside
+    document.addEventListener('click', () => {
+        if (popover && !popover.classList.contains('hidden')) {
+            popover.classList.add('hidden');
+            if (triggerBtn) {
+                triggerBtn.classList.remove('active');
+            }
+        }
+    });
+
+    // Theme toggles in popover
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const theme = btn.getAttribute('data-theme');
+            setTheme(theme);
+        });
+    });
+
+    // Popover settings button
+    const popoverSettingsBtn = document.getElementById('popover-btn-settings');
+    if (popoverSettingsBtn) {
+        popoverSettingsBtn.addEventListener('click', () => {
+            if (popover) popover.classList.add('hidden');
+            if (triggerBtn) triggerBtn.classList.remove('active');
+            switchTab('profile');
+        });
     }
-    const newCategoryInput = document.getElementById('new-category-name');
-    if (newCategoryInput) {
-        newCategoryInput.addEventListener('keydown', (e) => {
+
+    // Wallets inline form controls
+    const addWalletBtn = document.getElementById('popover-btn-add-wallet');
+    const walletForm = document.getElementById('popover-wallet-form');
+    if (addWalletBtn && walletForm) {
+        addWalletBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            walletForm.classList.remove('hidden');
+            document.getElementById('wallet-edit-id').value = '';
+            document.getElementById('wallet-name-input').value = '';
+            document.getElementById('wallet-balance-input').value = '';
+            document.getElementById('wallet-currency-select').value = state.globalCurrency;
+        });
+    }
+
+    const walletCancelBtn = document.getElementById('wallet-form-cancel');
+    if (walletCancelBtn && walletForm) {
+        walletCancelBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            walletForm.classList.add('hidden');
+            // reset form fields
+            document.getElementById('wallet-name-input').value = '';
+            document.getElementById('wallet-balance-input').value = '';
+            document.getElementById('wallet-edit-id').value = '';
+        });
+    }
+
+    const walletSaveBtn = document.getElementById('wallet-form-save');
+    if (walletSaveBtn) {
+        walletSaveBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            saveWalletForm();
+        });
+    }
+
+    // New Category Manager Bindings
+    const btnAddCategoryNew = document.getElementById('btn-add-category-new');
+    if (btnAddCategoryNew) {
+        btnAddCategoryNew.addEventListener('click', addCategoryNew);
+    }
+    const newCategoryInputNew = document.getElementById('new-category-name-new');
+    if (newCategoryInputNew) {
+        newCategoryInputNew.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
-                addCategory();
+                addCategoryNew();
             }
         });
     }
+    initCategoryColorPickerNew();
 }
 
 function changeMonth(delta) {
@@ -1956,6 +2244,9 @@ function openExpenseModal(expense = null) {
         radio.addEventListener('change', togglePeriodVisibility);
     });
 
+    const modalDeleteBtn = document.getElementById('modal-btn-delete');
+    const modalToggleActiveBtn = document.getElementById('modal-btn-toggle-active');
+
     if (expense) {
         titleEl.textContent = 'Редактировать трату';
         document.getElementById('expense-id').value = expense.id;
@@ -1973,11 +2264,30 @@ function openExpenseModal(expense = null) {
 
         // Set period select
         document.getElementById('expense-period').value = expense.period || 'monthly';
+
+        // Show delete and pause/resume buttons
+        if (modalDeleteBtn) modalDeleteBtn.classList.remove('hidden');
+        if (modalToggleActiveBtn) {
+            const isSubscription = expType === 'subscription';
+            if (isSubscription) {
+                modalToggleActiveBtn.classList.remove('hidden');
+                modalToggleActiveBtn.title = expense.active ? 'Приостановить подписку' : 'Возобновить подписку';
+                modalToggleActiveBtn.innerHTML = expense.active
+                    ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`
+                    : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+            } else {
+                modalToggleActiveBtn.classList.add('hidden');
+            }
+        }
     } else {
         titleEl.textContent = 'Добавить трату';
         document.getElementById('expense-id').value = '';
         document.getElementById('expense-period').value = 'monthly';
         document.querySelector('input[name="expense-type"][value="subscription"]').checked = true;
+
+        // Hide delete and pause/resume buttons
+        if (modalDeleteBtn) modalDeleteBtn.classList.add('hidden');
+        if (modalToggleActiveBtn) modalToggleActiveBtn.classList.add('hidden');
     }
 
     // Initialize visibility on open
@@ -2401,7 +2711,8 @@ function exportData() {
         budgets: state.budgets,
         rates: state.rates,
         globalCurrency: state.globalCurrency,
-        customCategories: customCategories
+        customCategories: customCategories,
+        wallets: state.wallets
     };
 
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup, null, 2));
@@ -2437,6 +2748,9 @@ function importData(e) {
                 if (parsed.globalCurrency) {
                     state.globalCurrency = parsed.globalCurrency;
                     document.getElementById('global-currency-select').value = parsed.globalCurrency;
+                }
+                if (parsed.wallets) {
+                    state.wallets = parsed.wallets;
                 }
 
                 saveStateToStorage();
@@ -2496,6 +2810,7 @@ function importData(e) {
                 alert('Данные успешно импортированы!');
                 closeSettingsModal();
                 updateUI();
+                renderPopoverWallets();
             } else {
                 alert('Некорректный формат файла бэкапа! Отсутствует список расходов.');
             }
@@ -2560,20 +2875,24 @@ function switchTab(tabName) {
     const navDashboard = document.getElementById('nav-dashboard');
     const navSubs = document.getElementById('nav-subscriptions');
     const navAnalytics = document.getElementById('nav-analytics');
+    const navSettings = document.getElementById('nav-settings');
 
     const viewDashboard = document.getElementById('view-dashboard');
     const viewSubs = document.getElementById('view-subscriptions');
     const viewAnalytics = document.getElementById('view-analytics');
+    const viewProfile = document.getElementById('view-profile');
 
     // Reset active nav items
     navDashboard.classList.remove('active');
     navSubs.classList.remove('active');
     if (navAnalytics) navAnalytics.classList.remove('active');
+    if (navSettings) navSettings.classList.remove('active');
 
     // Hide all views
     viewDashboard.classList.add('hidden');
     viewSubs.classList.add('hidden');
     if (viewAnalytics) viewAnalytics.classList.add('hidden');
+    if (viewProfile) viewProfile.classList.add('hidden');
 
     if (tabName === 'dashboard') {
         navDashboard.classList.add('active');
@@ -2587,6 +2906,10 @@ function switchTab(tabName) {
         if (navAnalytics) navAnalytics.classList.add('active');
         if (viewAnalytics) viewAnalytics.classList.remove('hidden');
         renderAnalyticsTab();
+    } else if (tabName === 'profile') {
+        if (navSettings) navSettings.classList.add('active');
+        if (viewProfile) viewProfile.classList.remove('hidden');
+        renderProfileTab();
     }
 }
 
@@ -3601,8 +3924,11 @@ const ONBOARDING_STEPS = [
 ];
 
 function startOnboardingTour() {
+    switchTab('dashboard');
     onboardingCurrentStep = 0;
-    showOnboardingStep(0);
+    setTimeout(() => {
+        showOnboardingStep(0);
+    }, 50);
 }
 
 function closeOnboardingTour() {
@@ -3702,6 +4028,7 @@ let activeStoryIndex = 0;
 let storyTimer = null;
 let storyProgress = 0;
 let storyPaused = false;
+let storyLockedPaused = false;
 const STORY_DURATION = 20000; // 20 seconds per slide
 const STORY_TICK = 50; // Update progress every 50ms
 
@@ -3709,6 +4036,7 @@ function openStory(index) {
     activeStoryIndex = index;
     storyProgress = 0;
     storyPaused = false;
+    storyLockedPaused = false;
     
     const modal = document.getElementById('story-viewer-modal');
     if (modal) {
@@ -3836,7 +4164,8 @@ function prevStory() {
 }
 
 function toggleStoryPause() {
-    storyPaused = !storyPaused;
+    storyLockedPaused = !storyLockedPaused;
+    storyPaused = storyLockedPaused;
     updatePauseButtonState(storyPaused);
 }
 
@@ -3863,16 +4192,27 @@ function updatePauseButtonState(paused) {
 function setupStoriesHoldListeners() {
     const storyCardBody = document.getElementById('story-viewer-card-body');
     if (storyCardBody) {
+        const stopBubble = (e) => e.stopPropagation();
+        document.querySelectorAll('.story-viewer-close, .story-pause-btn, .story-nav-btn').forEach(btn => {
+            btn.addEventListener('mousedown', stopBubble);
+            btn.addEventListener('touchstart', stopBubble, { passive: true });
+            btn.addEventListener('mouseup', stopBubble);
+            btn.addEventListener('touchend', stopBubble);
+        });
+
         storyCardBody.addEventListener('mousedown', () => {
+            if (storyLockedPaused) return;
             storyPaused = true;
             updatePauseButtonState(true);
         });
         storyCardBody.addEventListener('touchstart', (e) => {
+            if (storyLockedPaused) return;
             storyPaused = true;
             updatePauseButtonState(true);
         }, { passive: true });
         
         const resumeAction = () => {
+            if (storyLockedPaused) return;
             if (storyPaused) {
                 storyPaused = false;
                 updatePauseButtonState(false);
@@ -3889,14 +4229,14 @@ function setupStoriesHoldListeners() {
 function handleStoryCTA() {
     closeStory();
     if (activeStoryIndex === 0 || activeStoryIndex === 1) {
-        openSettingsModal();
+        switchTab('profile');
     } else if (activeStoryIndex === 2) {
         if (state.authMode === 'demo') {
             state.authMode = 'ask';
             localStorage.setItem('finchaos_auth_mode', 'ask');
             initAuthUI();
         } else {
-            openSettingsModal();
+            switchTab('profile');
         }
     }
 }
@@ -4054,4 +4394,489 @@ document.addEventListener('click', () => {
 
 window.initCustomSelects = initCustomSelects;
 window.closeAllDropdowns = closeAllDropdowns;
+
+// ==========================================================================
+// Theme, Profile Settings & Wallets Management Helpers
+// ==========================================================================
+
+function escapeHTML(str) {
+    if (typeof str !== 'string') return '';
+    return str.replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#039;');
+}
+
+function setTheme(theme) {
+    state.theme = theme;
+    localStorage.setItem('finchaos_theme', theme);
+
+    const rootEl = document.documentElement;
+    if (theme === 'dark') {
+        rootEl.classList.add('dark-theme');
+    } else if (theme === 'light') {
+        rootEl.classList.remove('dark-theme');
+    } else if (theme === 'system') {
+        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (isDark) {
+            rootEl.classList.add('dark-theme');
+        } else {
+            rootEl.classList.remove('dark-theme');
+        }
+    }
+
+    // Update active theme buttons in the UI
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+        if (btn.getAttribute('data-theme') === theme) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+}
+window.setTheme = setTheme;
+
+// Listen to system theme preference changes
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+    if (state.theme === 'system') {
+        if (e.matches) {
+            document.documentElement.classList.add('dark-theme');
+        } else {
+            document.documentElement.classList.remove('dark-theme');
+        }
+    }
+});
+
+function updateProfileName(name) {
+    state.profileName = name.trim();
+    localStorage.setItem('finchaos_username', state.profileName);
+
+    const nameToUse = state.profileName || (state.currentUser ? state.currentUser.email.split('@')[0] : 'Демо-пользователь');
+    const userNameEl = document.getElementById('user-profile-name');
+    const userAvatarEl = document.getElementById('user-profile-avatar');
+
+    if (userNameEl) userNameEl.textContent = nameToUse;
+    if (userAvatarEl) {
+        const parts = nameToUse.trim().split(/\s+/);
+        let initials = '';
+        if (parts.length > 0) {
+            if (parts[0]) initials += parts[0][0].toUpperCase();
+            if (parts[1]) initials += parts[1][0].toUpperCase();
+        }
+        userAvatarEl.textContent = initials || 'DM';
+    }
+
+    alert('Имя профиля успешно обновлено!');
+}
+window.updateProfileName = updateProfileName;
+
+function convertAmount(amount, fromCurrency, toCurrency) {
+    if (fromCurrency === toCurrency) return amount;
+    
+    let rubAmount;
+    if (fromCurrency === 'RUB') {
+        rubAmount = amount;
+    } else {
+        const rate = state.rates[fromCurrency] || 1;
+        rubAmount = amount * rate;
+    }
+
+    if (toCurrency === 'RUB') {
+        return rubAmount;
+    } else {
+        const rate = state.rates[toCurrency] || 1;
+        return rubAmount / rate;
+    }
+}
+window.convertAmount = convertAmount;
+
+function saveWalletsToStorage() {
+    localStorage.setItem('finchaos_wallets', JSON.stringify(state.wallets));
+}
+
+function renderPopoverWallets() {
+    const listEl = document.getElementById('popover-wallets-list');
+    if (!listEl) return;
+
+    listEl.innerHTML = '';
+    let totalWorthRub = 0;
+
+    state.wallets.forEach(wallet => {
+        const balanceInRub = convertAmount(wallet.balance, wallet.currency, 'RUB');
+        totalWorthRub += balanceInRub;
+
+        const itemEl = document.createElement('div');
+        itemEl.className = 'wallet-item';
+        itemEl.dataset.id = wallet.id;
+
+        const formattedBalance = formatCurrency(wallet.balance, wallet.currency);
+
+        itemEl.innerHTML = `
+            <div class="wallet-info" onclick="editWalletInline('${wallet.id}')">
+                <span class="wallet-name-label">${escapeHTML(wallet.name)}</span>
+                <span class="wallet-balance-label">${formattedBalance}</span>
+            </div>
+            <div class="wallet-actions">
+                <button type="button" class="wallet-action-btn edit-btn" onclick="editWalletInline('${wallet.id}')" title="Редактировать">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                </button>
+                <button type="button" class="wallet-action-btn delete-btn" onclick="deleteWallet('${wallet.id}')" title="Удалить">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+            </div>
+        `;
+        listEl.appendChild(itemEl);
+    });
+
+    const totalInGlobal = convertAmount(totalWorthRub, 'RUB', state.globalCurrency);
+    const totalLabelEl = document.getElementById('wallets-total-worth');
+    if (totalLabelEl) {
+        totalLabelEl.textContent = formatCurrency(totalInGlobal, state.globalCurrency);
+    }
+}
+window.renderPopoverWallets = renderPopoverWallets;
+
+function addWallet(name, balance, currency) {
+    const wallet = {
+        id: 'wallet-' + Math.random().toString(36).substr(2, 9),
+        name: name.trim(),
+        balance: parseFloat(balance) || 0,
+        currency: currency
+    };
+    state.wallets.push(wallet);
+    saveWalletsToStorage();
+    renderPopoverWallets();
+}
+window.addWallet = addWallet;
+
+function deleteWallet(id) {
+    if (confirm('Вы уверены, что хотите удалить этот счет?')) {
+        state.wallets = state.wallets.filter(w => w.id !== id);
+        saveWalletsToStorage();
+        renderPopoverWallets();
+        const form = document.getElementById('popover-wallet-form');
+        const editIdEl = document.getElementById('wallet-edit-id');
+        if (editIdEl && editIdEl.value === id) {
+            form.classList.add('hidden');
+            document.getElementById('wallet-name-input').value = '';
+            document.getElementById('wallet-balance-input').value = '';
+            editIdEl.value = '';
+        }
+    }
+}
+window.deleteWallet = deleteWallet;
+
+function editWalletInline(id) {
+    const wallet = state.wallets.find(w => w.id === id);
+    if (!wallet) return;
+
+    const form = document.getElementById('popover-wallet-form');
+    form.classList.remove('hidden');
+
+    document.getElementById('wallet-edit-id').value = wallet.id;
+    document.getElementById('wallet-name-input').value = wallet.name;
+    document.getElementById('wallet-balance-input').value = wallet.balance;
+    document.getElementById('wallet-currency-select').value = wallet.currency;
+}
+window.editWalletInline = editWalletInline;
+
+function saveWalletForm() {
+    const id = document.getElementById('wallet-edit-id').value;
+    const name = document.getElementById('wallet-name-input').value.trim();
+    const balance = parseFloat(document.getElementById('wallet-balance-input').value) || 0;
+    const currency = document.getElementById('wallet-currency-select').value;
+
+    if (!name) {
+        alert('Введите название счета');
+        return;
+    }
+
+    if (id) {
+        const wallet = state.wallets.find(w => w.id === id);
+        if (wallet) {
+            wallet.name = name;
+            wallet.balance = balance;
+            wallet.currency = currency;
+        }
+    } else {
+        addWallet(name, balance, currency);
+    }
+
+    saveWalletsToStorage();
+    renderPopoverWallets();
+    
+    const form = document.getElementById('popover-wallet-form');
+    form.classList.add('hidden');
+    // reset form fields
+    document.getElementById('wallet-name-input').value = '';
+    document.getElementById('wallet-balance-input').value = '';
+    document.getElementById('wallet-edit-id').value = '';
+}
+window.saveWalletForm = saveWalletForm;
+
+function renderProfileTab() {
+    const usernameInput = document.getElementById('profile-username-input');
+    const storedName = localStorage.getItem('finchaos_username');
+    const defaultName = state.currentUser ? state.currentUser.email.split('@')[0] : 'Демо-пользователь';
+    if (usernameInput) usernameInput.value = storedName || defaultName;
+
+    const emailDisplay = document.getElementById('profile-email-display');
+    if (emailDisplay) {
+        emailDisplay.value = state.authMode === 'supabase' && state.currentUser ? state.currentUser.email : 'Локальный режим (Демо)';
+    }
+
+    const newsCheckbox = document.getElementById('profile-notif-news');
+    if (newsCheckbox) {
+        newsCheckbox.checked = localStorage.getItem('finchaos_notif_news') === 'true';
+    }
+
+    const ratesAutoUpdate = localStorage.getItem('finchaos_rates_auto_update') !== 'false';
+    const autoUpdateInput = document.getElementById('rates-auto-update-input-new');
+    if (autoUpdateInput) {
+        autoUpdateInput.checked = ratesAutoUpdate;
+    }
+
+    const usdInput = document.getElementById('rate-usd-input-new');
+    const eurInput = document.getElementById('rate-eur-input-new');
+    if (usdInput) usdInput.value = state.rates.USD;
+    if (eurInput) eurInput.value = state.rates.EUR;
+
+    syncRatesInputStateNew();
+    renderSettingsCategoriesNew();
+}
+window.renderProfileTab = renderProfileTab;
+
+function syncRatesInputStateNew() {
+    const autoUpdateCheckbox = document.getElementById('rates-auto-update-input-new');
+    const autoUpdate = autoUpdateCheckbox ? autoUpdateCheckbox.checked : false;
+    const usdInput = document.getElementById('rate-usd-input-new');
+    const eurInput = document.getElementById('rate-eur-input-new');
+    
+    if (usdInput && eurInput) {
+        usdInput.disabled = autoUpdate;
+        eurInput.disabled = autoUpdate;
+    }
+}
+window.syncRatesInputStateNew = syncRatesInputStateNew;
+
+function saveSettingsFormNew() {
+    const autoUpdateCheckbox = document.getElementById('rates-auto-update-input-new');
+    const autoUpdate = autoUpdateCheckbox ? autoUpdateCheckbox.checked : false;
+    localStorage.setItem('finchaos_rates_auto_update', autoUpdate ? 'true' : 'false');
+
+    if (!autoUpdate) {
+        const usd = parseFloat(document.getElementById('rate-usd-input-new').value);
+        const eur = parseFloat(document.getElementById('rate-eur-input-new').value);
+
+        if (isNaN(usd) || usd <= 0 || isNaN(eur) || eur <= 0) {
+            alert('Курсы валют должны быть положительными числами!');
+            return;
+        }
+
+        state.rates.USD = usd;
+        state.rates.EUR = eur;
+
+        if (state.authMode === 'supabase' && state.currentUser) {
+            saveSettingsToSupabase();
+        }
+        saveStateToStorage();
+        updateUI();
+    } else {
+        loadExchangeRates();
+    }
+
+    alert('Курсы валют успешно сохранены!');
+}
+window.saveSettingsFormNew = saveSettingsFormNew;
+
+function renderSettingsCategoriesNew() {
+    const listEl = document.getElementById('settings-categories-list-new');
+    if (!listEl) return;
+    
+    listEl.innerHTML = '';
+    
+    Object.keys(state.categories).forEach(id => {
+        const cat = state.categories[id];
+        const item = document.createElement('div');
+        item.className = 'category-item';
+        item.dataset.id = id;
+        
+        const badgeClass = cat.system ? `badge-${id}` : `badge-${cat.color}`;
+        const nameDisplay = `<span class="badge-category ${badgeClass}">${cat.name}</span>`;
+        
+        let actionsHtml = '';
+        if (cat.system) {
+            actionsHtml = `
+                <span style="color: var(--text-muted); padding: 6px; display: flex; align-items: center;" title="Системная категория защищена">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                </span>
+            `;
+        } else {
+            actionsHtml = `
+                <button type="button" class="btn-card-action btn-edit-cat" title="Редактировать" onclick="editCategoryInlineNew('${id}')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                </button>
+                <button type="button" class="btn-card-action btn-delete-cat" title="Удалить" onclick="deleteCategoryNew('${id}')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+            `;
+        }
+        
+        item.innerHTML = `
+            <div class="category-item-info">
+                ${nameDisplay}
+            </div>
+            <div class="category-item-actions">
+                ${actionsHtml}
+            </div>
+        `;
+        listEl.appendChild(item);
+    });
+}
+window.renderSettingsCategoriesNew = renderSettingsCategoriesNew;
+
+function editCategoryInlineNew(id) {
+    const itemEl = document.querySelector(`#settings-categories-list-new .category-item[data-id="${id}"]`);
+    if (!itemEl) return;
+    
+    const cat = state.categories[id];
+    if (!cat || cat.system) return;
+    
+    const infoEl = itemEl.querySelector('.category-item-info');
+    const actionsEl = itemEl.querySelector('.category-item-actions');
+    
+    const oldInfoHtml = infoEl.innerHTML;
+    const oldActionsHtml = actionsEl.innerHTML;
+    
+    infoEl.innerHTML = `
+        <input type="text" class="category-item-name-input" value="${cat.name}">
+    `;
+    
+    actionsEl.innerHTML = `
+        <button type="button" class="btn-card-action btn-save-cat-inline" title="Сохранить" style="color: var(--success-text);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </button>
+        <button type="button" class="btn-card-action btn-cancel-cat-inline" title="Отмена" style="color: var(--text-muted);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+    `;
+    
+    const input = infoEl.querySelector('.category-item-name-input');
+    input.focus();
+    input.select();
+    
+    actionsEl.querySelector('.btn-save-cat-inline').addEventListener('click', () => {
+        const newName = input.value.trim();
+        if (!newName) {
+            alert('Название категории не может быть пустым!');
+            return;
+        }
+        
+        state.categories[id].name = newName;
+        CATEGORY_MAP[id] = newName;
+        
+        saveCustomCategoriesToStorage();
+        
+        renderSettingsCategoriesNew();
+        populateCategoryDropdowns();
+        updateUI();
+    });
+    
+    actionsEl.querySelector('.btn-cancel-cat-inline').addEventListener('click', () => {
+        infoEl.innerHTML = oldInfoHtml;
+        actionsEl.innerHTML = oldActionsHtml;
+    });
+    
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            actionsEl.querySelector('.btn-save-cat-inline').click();
+        } else if (e.key === 'Escape') {
+            actionsEl.querySelector('.btn-cancel-cat-inline').click();
+        }
+    });
+}
+window.editCategoryInlineNew = editCategoryInlineNew;
+
+function deleteCategoryNew(id) {
+    const cat = state.categories[id];
+    if (!cat || cat.system) return;
+    
+    if (confirm(`Вы уверены, что хотите удалить категорию "${cat.name}"? Все расходы и подписки из этой категории будут автоматически перенесены в категорию "Другое" (other).`)) {
+        let modifiedExpenses = false;
+        state.expenses.forEach(exp => {
+            if (exp.category === id) {
+                exp.category = 'other';
+                modifiedExpenses = true;
+            }
+        });
+        
+        delete state.categories[id];
+        delete CATEGORY_MAP[id];
+        
+        saveCustomCategoriesToStorage();
+        
+        if (modifiedExpenses) {
+            saveStateToStorage();
+        }
+        
+        renderSettingsCategoriesNew();
+        populateCategoryDropdowns();
+        updateUI();
+    }
+}
+window.deleteCategoryNew = deleteCategoryNew;
+
+function addCategoryNew() {
+    const input = document.getElementById('new-category-name-new');
+    if (!input) return;
+    
+    const name = input.value.trim();
+    if (!name) {
+        alert('Пожалуйста, введите название категории!');
+        return;
+    }
+    
+    const nameExists = Object.values(state.categories).some(c => c.name.toLowerCase() === name.toLowerCase());
+    if (nameExists) {
+        alert('Категория с таким названием уже существует!');
+        return;
+    }
+    
+    const selectedColorEl = document.querySelector('#category-color-picker-new .color-preset-circle.selected');
+    const color = selectedColorEl ? selectedColorEl.dataset.color : 'purple';
+    
+    const id = 'custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+    
+    state.categories[id] = {
+        name: name,
+        color: color,
+        system: false
+    };
+    
+    CATEGORY_MAP[id] = name;
+    
+    input.value = '';
+    
+    saveCustomCategoriesToStorage();
+    
+    renderSettingsCategoriesNew();
+    populateCategoryDropdowns();
+    updateUI();
+}
+window.addCategoryNew = addCategoryNew;
+
+function initCategoryColorPickerNew() {
+    const picker = document.getElementById('category-color-picker-new');
+    if (!picker) return;
+    
+    const circles = picker.querySelectorAll('.color-preset-circle');
+    circles.forEach(c => {
+        c.addEventListener('click', () => {
+            circles.forEach(other => other.classList.remove('selected'));
+            c.classList.add('selected');
+        });
+    });
+}
+window.initCategoryColorPickerNew = initCategoryColorPickerNew;
 
