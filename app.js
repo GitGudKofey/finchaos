@@ -70,6 +70,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await checkUserSession();
     initEventListeners();
     initAuthUI();
+    await loadExchangeRates();
 });
 
 function initAuthModeAndClient() {
@@ -381,7 +382,7 @@ async function saveSettingsToSupabase() {
             global_currency: state.globalCurrency,
             rate_usd: state.rates.USD,
             rate_eur: state.rates.EUR
-        });
+        }, { onConflict: 'user_id' });
     } catch (err) {
         console.error('Error saving settings to Supabase:', err);
     }
@@ -460,7 +461,7 @@ async function migrateLocalDataToSupabase(userId) {
             global_currency: currency,
             rate_usd: rates.USD || 90,
             rate_eur: rates.EUR || 98
-        });
+        }, { onConflict: 'user_id' });
 
     } catch (err) {
         console.error('Failed to migrate data to Supabase:', err);
@@ -770,6 +771,39 @@ function getInitials(name) {
         .map(word => word.charAt(0))
         .join('')
         .toUpperCase();
+}
+
+async function fetchCBRRates() {
+    try {
+        const response = await fetch('https://www.cbr-xml-daily.ru/daily_json.js');
+        if (!response.ok) throw new Error('CBR server response error');
+        const data = await response.json();
+        if (data && data.Valute && data.Valute.USD && data.Valute.EUR) {
+            return {
+                USD: Number(data.Valute.USD.Value),
+                EUR: Number(data.Valute.EUR.Value)
+            };
+        }
+    } catch (err) {
+        console.error('Failed to fetch rates from CBR API:', err);
+    }
+    return null;
+}
+
+async function loadExchangeRates() {
+    const autoUpdate = localStorage.getItem('finchaos_rates_auto_update') !== 'false';
+    if (autoUpdate) {
+        const cbrRates = await fetchCBRRates();
+        if (cbrRates) {
+            state.rates.USD = cbrRates.USD;
+            state.rates.EUR = cbrRates.EUR;
+            saveStateToStorage();
+            if (state.authMode === 'supabase' && state.currentUser) {
+                await saveSettingsToSupabase();
+            }
+            updateUI();
+        }
+    }
 }
 
 // ==========================================================================
@@ -1768,6 +1802,11 @@ function initEventListeners() {
             window.location.reload();
         });
     }
+
+    const autoUpdateCheckbox = document.getElementById('rates-auto-update-input');
+    if (autoUpdateCheckbox) {
+        autoUpdateCheckbox.addEventListener('change', syncRatesInputState);
+    }
 }
 
 function changeMonth(delta) {
@@ -2203,10 +2242,32 @@ function togglePaidStatus(id, isPaid) {
 // Settings Modal Actions
 // ==========================================================================
 
+function syncRatesInputState() {
+    const autoUpdateCheckbox = document.getElementById('rates-auto-update-input');
+    const autoUpdate = autoUpdateCheckbox ? autoUpdateCheckbox.checked : false;
+    const usdInput = document.getElementById('rate-usd-input');
+    const eurInput = document.getElementById('rate-eur-input');
+    
+    if (usdInput && eurInput) {
+        usdInput.disabled = autoUpdate;
+        eurInput.disabled = autoUpdate;
+    }
+}
+window.syncRatesInputState = syncRatesInputState;
+
 function openSettingsModal() {
     const modalEl = document.getElementById('settings-modal');
+    const autoUpdate = localStorage.getItem('finchaos_rates_auto_update') !== 'false';
+    const autoUpdateCheckbox = document.getElementById('rates-auto-update-input');
+    
+    if (autoUpdateCheckbox) {
+        autoUpdateCheckbox.checked = autoUpdate;
+    }
+    
     document.getElementById('rate-usd-input').value = state.rates.USD;
     document.getElementById('rate-eur-input').value = state.rates.EUR;
+    
+    syncRatesInputState();
     modalEl.classList.add('active');
 }
 
@@ -2215,24 +2276,33 @@ function closeSettingsModal() {
 }
 
 function saveSettingsForm() {
-    const usd = parseFloat(document.getElementById('rate-usd-input').value);
-    const eur = parseFloat(document.getElementById('rate-eur-input').value);
+    const autoUpdateCheckbox = document.getElementById('rates-auto-update-input');
+    const autoUpdate = autoUpdateCheckbox ? autoUpdateCheckbox.checked : false;
+    localStorage.setItem('finchaos_rates_auto_update', autoUpdate ? 'true' : 'false');
 
-    if (isNaN(usd) || usd <= 0 || isNaN(eur) || eur <= 0) {
-        alert('Курсы валют должны быть положительными числами!');
-        return;
+    if (!autoUpdate) {
+        const usd = parseFloat(document.getElementById('rate-usd-input').value);
+        const eur = parseFloat(document.getElementById('rate-eur-input').value);
+
+        if (isNaN(usd) || usd <= 0 || isNaN(eur) || eur <= 0) {
+            alert('Курсы валют должны быть положительными числами!');
+            return;
+        }
+
+        state.rates.USD = usd;
+        state.rates.EUR = eur;
+
+        if (state.authMode === 'supabase' && state.currentUser) {
+            saveSettingsToSupabase();
+        }
+
+        saveStateToStorage();
+        closeSettingsModal();
+        updateUI();
+    } else {
+        closeSettingsModal();
+        loadExchangeRates();
     }
-
-    state.rates.USD = usd;
-    state.rates.EUR = eur;
-
-    if (state.authMode === 'supabase' && state.currentUser) {
-        saveSettingsToSupabase();
-    }
-
-    saveStateToStorage();
-    closeSettingsModal();
-    updateUI();
 }
 
 function exportData() {

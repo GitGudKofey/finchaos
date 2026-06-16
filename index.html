@@ -664,6 +664,13 @@
                 <!-- Exchange Rates -->
                 <div class="settings-section">
                     <h3 class="settings-section-title" style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;">Курсы валют (в рублях)</h3>
+                    <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px; margin-bottom: 12px; display: flex;">
+                        <label class="switch">
+                            <input type="checkbox" id="rates-auto-update-input" checked>
+                            <span class="slider"></span>
+                        </label>
+                        <label for="rates-auto-update-input" class="form-label" style="cursor: pointer; margin-bottom: 0; font-size: 13px; font-weight: 500; color: var(--text-secondary);">Автоматически обновлять курсы по ЦБ РФ</label>
+                    </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="rate-usd-input" class="form-label">Курс USD ($)</label>
