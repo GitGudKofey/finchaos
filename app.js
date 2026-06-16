@@ -3,7 +3,9 @@
    ========================================================================= */
 
 // Supabase Configuration
-const SUPABASE_URL = "https://loerfcxrwzmejszwsiple.supabase.co";
+const SUPABASE_URL = (window.location.hostname === 'localhost' || window.location.protocol === 'file:')
+    ? "https://loerfcxrwzmejszwsiple.supabase.co"
+    : `${window.location.origin}/api/supabase`;
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvZXJmY3hyd3ptZWpzendzaXBsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1ODgzODYsImV4cCI6MjA5NzE2NDM4Nn0.ixNlHSlkn7eS1x42lhb5oKoYKAN8Xx8jsl8loa1qh7s"; // Please insert your Supabase Anon Key here
 
 // Default Currency rates relative to RUB (Russian Ruble) if not set in storage
