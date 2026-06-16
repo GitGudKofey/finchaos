@@ -276,6 +276,15 @@ function setupAuthFormListeners() {
         localStorage.setItem('finchaos_auth_mode', 'demo');
         initAuthUI();
     }
+
+    const tabSignin = document.getElementById('auth-tab-signin');
+    const tabSignup = document.getElementById('auth-tab-signup');
+    if (tabSignin) {
+        tabSignin.addEventListener('click', () => switchAuthTab('signin'));
+    }
+    if (tabSignup) {
+        tabSignup.addEventListener('click', () => switchAuthTab('signup'));
+    }
 }
 
 function switchAuthTab(tab) {
