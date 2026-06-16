@@ -409,8 +409,15 @@ async function migrateLocalDataToSupabase(userId) {
         if (storedExpenses) {
             const localExpenses = JSON.parse(storedExpenses);
             if (localExpenses && localExpenses.length > 0) {
-                const dbRows = localExpenses.map(exp => ({
-                    id: exp.id || ('exp-' + Date.now() + Math.random().toString(36).substr(2, 5)),
+                // Generate fresh unique IDs to avoid primary key conflicts
+                const remappedExpenses = remapIds(localExpenses);
+                
+                // Save remapped expenses back to state and localStorage so that local version matches Supabase
+                state.expenses = remappedExpenses;
+                localStorage.setItem('finchaos_expenses', JSON.stringify(remappedExpenses));
+
+                const dbRows = remappedExpenses.map(exp => ({
+                    id: exp.id,
                     user_id: userId,
                     subscription_id: exp.subscriptionId,
                     type: exp.type || 'subscription',
@@ -771,6 +778,28 @@ function getInitials(name) {
         .map(word => word.charAt(0))
         .join('')
         .toUpperCase();
+}
+
+// Remap all expense and subscription IDs to avoid global primary key conflicts
+function remapIds(expenses) {
+    if (!Array.isArray(expenses)) return [];
+    const subIdMap = new Map();
+    return expenses.map((exp, idx) => {
+        const newId = 'exp-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9) + '-' + idx;
+        let oldSubId = exp.subscriptionId || exp.subscription_id || null;
+        let newSubId = null;
+        if (oldSubId) {
+            if (!subIdMap.has(oldSubId)) {
+                subIdMap.set(oldSubId, 'sub-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9) + '-' + idx);
+            }
+            newSubId = subIdMap.get(oldSubId);
+        }
+        return {
+            ...exp,
+            id: newId,
+            subscriptionId: newSubId
+        };
+    });
 }
 
 async function fetchCBRRates() {
@@ -2331,7 +2360,9 @@ function importData(e) {
         try {
             const parsed = JSON.parse(evt.target.result);
             if (parsed && Array.isArray(parsed.expenses)) {
-                state.expenses = parsed.expenses;
+                // Generate fresh unique IDs to avoid primary key conflicts
+                const remappedExpenses = remapIds(parsed.expenses);
+                state.expenses = remappedExpenses;
                 state.budgets = parsed.budgets || {};
                 state.rates = parsed.rates || { ...DEFAULT_RATES };
                 if (parsed.globalCurrency) {
@@ -2351,7 +2382,7 @@ function importData(e) {
                         // Upload expenses
                         if (state.expenses.length > 0) {
                             const dbRows = state.expenses.map(exp => ({
-                                id: exp.id || ('exp-' + Date.now() + Math.random().toString(36).substr(2, 5)),
+                                id: exp.id,
                                 user_id: userId,
                                 subscription_id: exp.subscriptionId,
                                 type: exp.type || 'subscription',
