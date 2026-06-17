@@ -164,8 +164,9 @@ let state = {
     deleteTargetId: null,
     deleteTargetSubId: null,
     wallets: [],
-    theme: 'system',
-    profileName: ''
+    theme: 'light',
+    profileName: '',
+    expenseWalletLinks: {}
 };
 
 // ==========================================================================
@@ -178,6 +179,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await checkUserSession();
     initEventListeners();
     setupStoriesHoldListeners();
+    renderStoryPreviews();
     populateCategoryDropdowns();
     initAuthUI();
     await loadExchangeRates();
@@ -243,7 +245,7 @@ function initAuthUI() {
     state.profileName = storedName || '';
 
     // Initialize Theme
-    const savedTheme = localStorage.getItem('finchaos_theme') || 'system';
+    const savedTheme = localStorage.getItem('finchaos_theme') || 'light';
     setTheme(savedTheme);
 
     if (state.authMode === 'supabase' && state.currentUser) {
@@ -273,8 +275,22 @@ function initAuthUI() {
         loadStateFromSupabase().then(() => {
             updateUI();
             renderPopoverWallets();
-            if (!localStorage.getItem('finchaos_onboarding_completed')) {
-                setTimeout(() => startOnboardingTour(), 1500);
+            const hasExistingData = state.expenses.length > 0 || state.wallets.length > 0 || localStorage.getItem('finchaos_username') !== null;
+            if (hasExistingData) {
+                localStorage.setItem('finchaos_onboarding_wizard_completed', 'true');
+                localStorage.setItem('finchaos_onboarding_completed', 'true');
+            }
+            if (localStorage.getItem('finchaos_onboarding_wizard_completed') !== 'true') {
+                showOnboardingWizard();
+            } else {
+                const initialTab = window.location.hash.replace('#', '') || 'dashboard';
+                const validTabs = ['dashboard', 'subscriptions', 'analytics', 'profile'];
+                if (validTabs.includes(initialTab)) {
+                    switchTab(initialTab);
+                }
+                if (!localStorage.getItem('finchaos_onboarding_completed')) {
+                    setTimeout(() => startOnboardingTour(), 1500);
+                }
             }
         });
     } else if (state.authMode === 'demo') {
@@ -304,8 +320,22 @@ function initAuthUI() {
         loadStateFromStorage();
         updateUI();
         renderPopoverWallets();
-        if (!localStorage.getItem('finchaos_onboarding_completed')) {
-            setTimeout(() => startOnboardingTour(), 1500);
+        const hasExistingData = localStorage.getItem('finchaos_expenses') !== null || localStorage.getItem('finchaos_username') !== null || localStorage.getItem('finchaos_custom_categories') !== null;
+        if (hasExistingData) {
+            localStorage.setItem('finchaos_onboarding_wizard_completed', 'true');
+            localStorage.setItem('finchaos_onboarding_completed', 'true');
+        }
+        if (localStorage.getItem('finchaos_onboarding_wizard_completed') !== 'true') {
+            showOnboardingWizard();
+        } else {
+            const initialTab = window.location.hash.replace('#', '') || 'dashboard';
+            const validTabs = ['dashboard', 'subscriptions', 'analytics', 'profile'];
+            if (validTabs.includes(initialTab)) {
+                switchTab(initialTab);
+            }
+            if (!localStorage.getItem('finchaos_onboarding_completed')) {
+                setTimeout(() => startOnboardingTour(), 1500);
+            }
         }
     } else {
         if (viewAuth) viewAuth.classList.remove('hidden');
@@ -463,6 +493,9 @@ async function loadStateFromSupabase() {
     if (!supabaseClient || !state.currentUser) return;
 
     try {
+        const storedExpenseWalletLinks = localStorage.getItem('finchaos_expense_wallet_links');
+        state.expenseWalletLinks = storedExpenseWalletLinks ? JSON.parse(storedExpenseWalletLinks) : {};
+
         const { data: dbExpenses, error: expError } = await supabaseClient
             .from('expenses')
             .select('*');
@@ -483,7 +516,8 @@ async function loadStateFromSupabase() {
             comment: exp.comment,
             active: exp.active,
             paid: exp.paid,
-            deleted: exp.deleted
+            deleted: exp.deleted,
+            walletId: state.expenseWalletLinks[exp.id] || null
         }));
 
         const { data: dbBudgets, error: budError } = await supabaseClient
@@ -638,6 +672,9 @@ function loadStateFromStorage() {
     const storedWallets = localStorage.getItem('finchaos_wallets');
     const storedTheme = localStorage.getItem('finchaos_theme');
     const storedUsername = localStorage.getItem('finchaos_username');
+    const storedExpenseWalletLinks = localStorage.getItem('finchaos_expense_wallet_links');
+
+    state.expenseWalletLinks = storedExpenseWalletLinks ? JSON.parse(storedExpenseWalletLinks) : {};
 
     if (storedCurrency) {
         state.globalCurrency = storedCurrency;
@@ -671,11 +708,14 @@ function loadStateFromStorage() {
         ];
     }
 
-    state.theme = storedTheme || 'system';
+    state.theme = storedTheme || 'light';
     state.profileName = storedUsername || '';
 
     if (storedExpenses) {
         state.expenses = JSON.parse(storedExpenses);
+        state.expenses.forEach(exp => {
+            exp.walletId = state.expenseWalletLinks[exp.id] || null;
+        });
 
         // MIGRATION: Ensure all older entries have correct fields
         let migrated = false;
@@ -726,6 +766,7 @@ function saveStateToStorage() {
     localStorage.setItem('finchaos_wallets', JSON.stringify(state.wallets));
     localStorage.setItem('finchaos_theme', state.theme);
     localStorage.setItem('finchaos_username', state.profileName);
+    localStorage.setItem('finchaos_expense_wallet_links', JSON.stringify(state.expenseWalletLinks || {}));
 }
 
 function generateDemoData() {
@@ -1186,9 +1227,42 @@ function toggleDashboardViewMode(mode) {
     renderDashboardActiveView();
 }
 
+function getGreetingMessage() {
+    const hours = new Date().getHours();
+    let timeGreeting = 'Добрый день';
+    if (hours >= 5 && hours < 12) {
+        timeGreeting = 'Доброе утро';
+    } else if (hours >= 12 && hours < 18) {
+        timeGreeting = 'Добрый день';
+    } else if (hours >= 18 && hours < 24) {
+        timeGreeting = 'Добрый вечер';
+    } else {
+        timeGreeting = 'Доброй ночи';
+    }
+
+    let finalName = '';
+    if (state.profileName) {
+        finalName = state.profileName;
+    } else if (state.currentUser && state.currentUser.email) {
+        finalName = state.currentUser.email.split('@')[0];
+    }
+
+    if (finalName) {
+        const firstName = finalName.trim().split(/\s+/)[0];
+        return `${timeGreeting}, ${firstName}!`;
+    }
+    
+    return `${timeGreeting}!`;
+}
+
 function updateUI() {
     replicateSubscriptionsForCurrentMonth();
     updateMonthDisplay();
+
+    const greetingEl = document.getElementById('dashboard-greeting-title');
+    if (greetingEl) {
+        greetingEl.textContent = getGreetingMessage();
+    }
 
     const currentMonthExpenses = getCurrentMonthExpenses();
 
@@ -1869,6 +1943,25 @@ function initEventListeners() {
         updateUI();
     });
 
+    // Helper to safely bind click-outside closing of modals
+    function bindClickOutsideModal(modalId, closeFn) {
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
+        
+        let mousedownOnOverlay = false;
+        
+        modal.addEventListener('mousedown', (e) => {
+            mousedownOnOverlay = (e.target === modal);
+        });
+        
+        modal.addEventListener('mouseup', (e) => {
+            if (mousedownOnOverlay && e.target === modal) {
+                closeFn();
+            }
+            mousedownOnOverlay = false;
+        });
+    }
+
     // Floating action button / Add expense trigger
     document.getElementById('btn-add-expense').addEventListener('click', () => {
         openExpenseModal();
@@ -1877,9 +1970,7 @@ function initEventListeners() {
     // Modal Expense cancel / close
     document.getElementById('modal-close-btn').addEventListener('click', closeExpenseModal);
     document.getElementById('btn-cancel-expense').addEventListener('click', closeExpenseModal);
-    document.getElementById('expense-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'expense-modal') closeExpenseModal();
-    });
+    bindClickOutsideModal('expense-modal', closeExpenseModal);
 
     // Submit expense form
     document.getElementById('expense-form').addEventListener('submit', (e) => {
@@ -1917,9 +2008,7 @@ function initEventListeners() {
     document.getElementById('btn-edit-budget').addEventListener('click', openBudgetModal);
     document.getElementById('budget-modal-close-btn').addEventListener('click', closeBudgetModal);
     document.getElementById('btn-cancel-budget').addEventListener('click', closeBudgetModal);
-    document.getElementById('budget-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'budget-modal') closeBudgetModal();
-    });
+    bindClickOutsideModal('budget-modal', closeBudgetModal);
 
     // Submit budget form
     document.getElementById('budget-form').addEventListener('submit', (e) => {
@@ -1930,9 +2019,7 @@ function initEventListeners() {
     // Custom Deletion Confirm Modal events
     document.getElementById('delete-modal-close-btn').addEventListener('click', closeDeleteModal);
     document.getElementById('btn-cancel-delete').addEventListener('click', closeDeleteModal);
-    document.getElementById('delete-confirm-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'delete-confirm-modal') closeDeleteModal();
-    });
+    bindClickOutsideModal('delete-confirm-modal', closeDeleteModal);
 
     document.getElementById('btn-delete-all').addEventListener('click', () => {
         executeDeleteAll();
@@ -1999,6 +2086,84 @@ function initEventListeners() {
     if (importFileInputNew) {
         importFileInputNew.addEventListener('change', (e) => {
             importData(e);
+        });
+    }
+
+    // Email change listener
+    const emailChangeForm = document.getElementById('profile-email-change-form');
+    if (emailChangeForm) {
+        emailChangeForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newEmailInput = document.getElementById('security-new-email');
+            const alertMsg = document.getElementById('security-alert-msg');
+            if (!newEmailInput || !alertMsg) return;
+
+            alertMsg.className = 'auth-alert hidden';
+            alertMsg.textContent = '';
+
+            if (state.authMode !== 'supabase' || !supabaseClient) {
+                alertMsg.textContent = 'Ошибка: Смена почты доступна только в облачном режиме.';
+                alertMsg.className = 'auth-alert error';
+                alertMsg.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const { data, error } = await supabaseClient.auth.updateUser({ email: newEmailInput.value });
+                if (error) {
+                    alertMsg.textContent = 'Ошибка: ' + error.message;
+                    alertMsg.className = 'auth-alert error';
+                } else {
+                    alertMsg.textContent = 'Ссылка подтверждения отправлена на старую и новую почту. Пожалуйста, перейдите по ним для завершения.';
+                    alertMsg.className = 'auth-alert success';
+                    newEmailInput.value = '';
+                }
+                alertMsg.classList.remove('hidden');
+            } catch (err) {
+                console.error(err);
+                alertMsg.textContent = 'Произошла непредвиденная ошибка при смене email.';
+                alertMsg.className = 'auth-alert error';
+                alertMsg.classList.remove('hidden');
+            }
+        });
+    }
+
+    // Password change listener
+    const passwordChangeForm = document.getElementById('profile-password-change-form');
+    if (passwordChangeForm) {
+        passwordChangeForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newPasswordInput = document.getElementById('security-new-password');
+            const alertMsg = document.getElementById('security-alert-msg');
+            if (!newPasswordInput || !alertMsg) return;
+
+            alertMsg.className = 'auth-alert hidden';
+            alertMsg.textContent = '';
+
+            if (state.authMode !== 'supabase' || !supabaseClient) {
+                alertMsg.textContent = 'Ошибка: Смена пароля доступна только в облачном режиме.';
+                alertMsg.className = 'auth-alert error';
+                alertMsg.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const { data, error } = await supabaseClient.auth.updateUser({ password: newPasswordInput.value });
+                if (error) {
+                    alertMsg.textContent = 'Ошибка: ' + error.message;
+                    alertMsg.className = 'auth-alert error';
+                } else {
+                    alertMsg.textContent = 'Пароль успешно обновлен!';
+                    alertMsg.className = 'auth-alert success';
+                    newPasswordInput.value = '';
+                }
+                alertMsg.classList.remove('hidden');
+            } catch (err) {
+                console.error(err);
+                alertMsg.textContent = 'Произошла непредвиденная ошибка при смене пароля.';
+                alertMsg.className = 'auth-alert error';
+                alertMsg.classList.remove('hidden');
+            }
         });
     }
 
@@ -2176,6 +2341,56 @@ function initEventListeners() {
         });
     }
     initCategoryColorPickerNew();
+
+    // Onboarding Wizard bindings
+    const btnWizardPrev = document.getElementById('btn-wizard-prev');
+    if (btnWizardPrev) {
+        btnWizardPrev.addEventListener('click', handleWizardPrev);
+    }
+    
+    const btnWizardNext = document.getElementById('btn-wizard-next');
+    if (btnWizardNext) {
+        btnWizardNext.addEventListener('click', handleWizardNext);
+    }
+    
+    const btnWizardAddWallet = document.getElementById('btn-wizard-add-wallet');
+    if (btnWizardAddWallet) {
+        btnWizardAddWallet.addEventListener('click', addWizardWalletRow);
+    }
+
+    const btnWizardSkip = document.getElementById('btn-wizard-skip');
+    if (btnWizardSkip) {
+        btnWizardSkip.addEventListener('click', skipOnboardingWizard);
+    }
+    
+    // Bind Step 4 radio selection cards
+    const radioDemoLabel = document.getElementById('wizard-radio-demo-label');
+    const radioCleanLabel = document.getElementById('wizard-radio-clean-label');
+    
+    if (radioDemoLabel && radioCleanLabel) {
+        const demoModeInput = radioDemoLabel.querySelector('input');
+        const cleanModeInput = radioCleanLabel.querySelector('input');
+        
+        radioDemoLabel.addEventListener('click', () => {
+            radioDemoLabel.classList.add('active');
+            radioCleanLabel.classList.remove('active');
+            if (demoModeInput) demoModeInput.checked = true;
+        });
+        
+        radioCleanLabel.addEventListener('click', () => {
+            radioCleanLabel.classList.add('active');
+            radioDemoLabel.classList.remove('active');
+            if (cleanModeInput) cleanModeInput.checked = true;
+        });
+    }
+
+    window.addEventListener('hashchange', () => {
+        const tabName = window.location.hash.replace('#', '') || 'dashboard';
+        const validTabs = ['dashboard', 'subscriptions', 'analytics', 'profile'];
+        if (validTabs.includes(tabName) && state.activeTab !== tabName) {
+            switchTab(tabName);
+        }
+    });
 }
 
 function changeMonth(delta) {
@@ -2257,6 +2472,10 @@ function openExpenseModal(expense = null) {
         document.getElementById('expense-date').value = expense.date;
         document.getElementById('expense-link').value = expense.link || '';
         document.getElementById('expense-comment').value = expense.comment || '';
+        
+        // Populate and select wallet
+        populateWalletDropdown();
+        document.getElementById('expense-wallet').value = expense.walletId || '';
 
         // Select correct radio button
         const expType = expense.type || 'subscription';
@@ -2285,6 +2504,10 @@ function openExpenseModal(expense = null) {
         document.getElementById('expense-period').value = 'monthly';
         document.querySelector('input[name="expense-type"][value="subscription"]').checked = true;
 
+        // Reset wallet select
+        populateWalletDropdown();
+        document.getElementById('expense-wallet').value = '';
+
         // Hide delete and pause/resume buttons
         if (modalDeleteBtn) modalDeleteBtn.classList.add('hidden');
         if (modalToggleActiveBtn) modalToggleActiveBtn.classList.add('hidden');
@@ -2312,6 +2535,7 @@ function saveExpenseForm() {
     const comment = document.getElementById('expense-comment').value.trim();
     const type = document.querySelector('input[name="expense-type"]:checked').value;
     const period = type === 'subscription' ? document.getElementById('expense-period').value : null;
+    const walletId = document.getElementById('expense-wallet').value || null;
 
     if (!name || isNaN(amount) || !date) return;
 
@@ -2321,10 +2545,11 @@ function saveExpenseForm() {
             // Edit mode
             const index = state.expenses.findIndex(exp => exp.id === id);
             if (index !== -1) {
-                const oldType = state.expenses[index].type;
-                let subId = state.expenses[index].subscriptionId;
-                let isActive = state.expenses[index].active !== undefined ? state.expenses[index].active : true;
-                let isPaid = state.expenses[index].paid !== undefined ? state.expenses[index].paid : false;
+                const oldExpense = { ...state.expenses[index] };
+                const oldType = oldExpense.type;
+                let subId = oldExpense.subscriptionId;
+                let isActive = oldExpense.active !== undefined ? oldExpense.active : true;
+                let isPaid = oldExpense.paid !== undefined ? oldExpense.paid : false;
 
                 if (oldType !== type) {
                     if (type === 'subscription') {
@@ -2342,6 +2567,14 @@ function saveExpenseForm() {
                 const propagate = propagateGroup ? propagateGroup.checked : false;
 
                 if (type === 'subscription' && propagate && subId) {
+                    // Revert old amounts from old wallets
+                    state.expenses.forEach(exp => {
+                        if (exp.subscriptionId === subId && exp.paid && exp.walletId) {
+                            const w = state.wallets.find(wallet => wallet.id === exp.walletId);
+                            if (w) w.balance += convertAmount(exp.amount, exp.currency, w.currency);
+                        }
+                    });
+
                     const newDateObj = new Date(date);
                     const newDay = newDateObj.getDate();
 
@@ -2354,6 +2587,8 @@ function saveExpenseForm() {
                             exp.period = period;
                             exp.link = link;
                             exp.comment = comment;
+                            exp.walletId = walletId;
+                            state.expenseWalletLinks[exp.id] = walletId;
 
                             const instDate = new Date(exp.date);
                             const lastDayOfInstMonth = new Date(instDate.getFullYear(), instDate.getMonth() + 1, 0).getDate();
@@ -2361,6 +2596,12 @@ function saveExpenseForm() {
                             const mStr = String(instDate.getMonth() + 1).padStart(2, '0');
                             const dStr = String(adjustedDay).padStart(2, '0');
                             exp.date = `${instDate.getFullYear()}-${mStr}-${dStr}`;
+
+                            // Deduct new amount if paid
+                            if (exp.paid && exp.walletId) {
+                                const w = state.wallets.find(wallet => wallet.id === exp.walletId);
+                                if (w) w.balance -= convertAmount(exp.amount, exp.currency, w.currency);
+                            }
 
                             return supabaseClient.from('expenses').update({
                                 name: exp.name,
@@ -2377,12 +2618,26 @@ function saveExpenseForm() {
 
                     Promise.all(updatePromises).catch(err => console.error(err));
                 } else {
+                    // Revert old amount
+                    if (oldExpense.paid && oldExpense.walletId) {
+                        const w = state.wallets.find(wallet => wallet.id === oldExpense.walletId);
+                        if (w) w.balance += convertAmount(oldExpense.amount, oldExpense.currency, w.currency);
+                    }
+
                     const updatedObj = {
                         ...state.expenses[index],
                         name, amount, currency, category, date, link, comment,
-                        type, period, subscriptionId: subId, active: isActive, paid: isPaid
+                        type, period, subscriptionId: subId, active: isActive, paid: isPaid,
+                        walletId: walletId
                     };
                     state.expenses[index] = updatedObj;
+                    state.expenseWalletLinks[id] = walletId;
+
+                    // Deduct new amount if paid
+                    if (isPaid && walletId) {
+                        const w = state.wallets.find(wallet => wallet.id === walletId);
+                        if (w) w.balance -= convertAmount(amount, currency, w.currency);
+                    }
 
                     supabaseClient.from('expenses').update({
                         name: updatedObj.name,
@@ -2403,6 +2658,7 @@ function saveExpenseForm() {
         } else {
             // Add mode
             const isSub = type === 'subscription';
+            const isPaid = !isSub;
             const newExpense = {
                 id: 'exp-' + Date.now() + Math.random().toString(36).substr(2, 5),
                 subscriptionId: isSub ? 'sub-' + Date.now() : null,
@@ -2416,9 +2672,17 @@ function saveExpenseForm() {
                 link,
                 comment,
                 active: true,
-                paid: !isSub
+                paid: isPaid,
+                walletId: walletId
             };
             state.expenses.push(newExpense);
+            state.expenseWalletLinks[newExpense.id] = walletId;
+
+            // Deduct new amount if paid
+            if (isPaid && walletId) {
+                const w = state.wallets.find(wallet => wallet.id === walletId);
+                if (w) w.balance -= convertAmount(amount, currency, w.currency);
+            }
 
             supabaseClient.from('expenses').insert({
                 id: newExpense.id,
@@ -2443,10 +2707,11 @@ function saveExpenseForm() {
         if (id) {
             const index = state.expenses.findIndex(exp => exp.id === id);
             if (index !== -1) {
-                const oldType = state.expenses[index].type;
-                let subId = state.expenses[index].subscriptionId;
-                let isActive = state.expenses[index].active !== undefined ? state.expenses[index].active : true;
-                let isPaid = state.expenses[index].paid !== undefined ? state.expenses[index].paid : false;
+                const oldExpense = { ...state.expenses[index] };
+                const oldType = oldExpense.type;
+                let subId = oldExpense.subscriptionId;
+                let isActive = oldExpense.active !== undefined ? oldExpense.active : true;
+                let isPaid = oldExpense.paid !== undefined ? oldExpense.paid : false;
 
                 if (oldType !== type) {
                     if (type === 'subscription') {
@@ -2464,6 +2729,14 @@ function saveExpenseForm() {
                 const propagate = propagateGroup ? propagateGroup.checked : false;
 
                 if (type === 'subscription' && propagate && subId) {
+                    // Revert old amounts from old wallets
+                    state.expenses.forEach(exp => {
+                        if (exp.subscriptionId === subId && exp.paid && exp.walletId) {
+                            const w = state.wallets.find(wallet => wallet.id === exp.walletId);
+                            if (w) w.balance += convertAmount(exp.amount, exp.currency, w.currency);
+                        }
+                    });
+
                     const newDateObj = new Date(date);
                     const newDay = newDateObj.getDate();
 
@@ -2476,6 +2749,8 @@ function saveExpenseForm() {
                             exp.period = period;
                             exp.link = link;
                             exp.comment = comment;
+                            exp.walletId = walletId;
+                            state.expenseWalletLinks[exp.id] = walletId;
 
                             const instDate = new Date(exp.date);
                             const lastDayOfInstMonth = new Date(instDate.getFullYear(), instDate.getMonth() + 1, 0).getDate();
@@ -2483,18 +2758,41 @@ function saveExpenseForm() {
                             const mStr = String(instDate.getMonth() + 1).padStart(2, '0');
                             const dStr = String(adjustedDay).padStart(2, '0');
                             exp.date = `${instDate.getFullYear()}-${mStr}-${dStr}`;
+
+                            // Deduct new amount if paid
+                            if (exp.paid && exp.walletId) {
+                                const w = state.wallets.find(wallet => wallet.id === exp.walletId);
+                                if (w) w.balance -= convertAmount(exp.amount, exp.currency, w.currency);
+                            }
                         }
                     });
                 } else {
-                    state.expenses[index] = {
+                    // Revert old amount
+                    if (oldExpense.paid && oldExpense.walletId) {
+                        const w = state.wallets.find(wallet => wallet.id === oldExpense.walletId);
+                        if (w) w.balance += convertAmount(oldExpense.amount, oldExpense.currency, w.currency);
+                    }
+
+                    const updatedObj = {
                         ...state.expenses[index],
                         name, amount, currency, category, date, link, comment,
-                        type, period, subscriptionId: subId, active: isActive, paid: isPaid
+                        type, period, subscriptionId: subId, active: isActive, paid: isPaid,
+                        walletId: walletId
                     };
+                    state.expenses[index] = updatedObj;
+                    state.expenseWalletLinks[id] = walletId;
+
+                    // Deduct new amount if paid
+                    if (isPaid && walletId) {
+                        const w = state.wallets.find(wallet => wallet.id === walletId);
+                        if (w) w.balance -= convertAmount(amount, currency, w.currency);
+                    }
                 }
             }
         } else {
+            // Add mode
             const isSub = type === 'subscription';
+            const isPaid = !isSub;
             const newExpense = {
                 id: 'exp-' + Date.now() + Math.random().toString(36).substr(2, 5),
                 subscriptionId: isSub ? 'sub-' + Date.now() : null,
@@ -2508,13 +2806,23 @@ function saveExpenseForm() {
                 link,
                 comment,
                 active: true,
-                paid: !isSub
+                paid: isPaid,
+                walletId: walletId
             };
             state.expenses.push(newExpense);
+            state.expenseWalletLinks[newExpense.id] = walletId;
+
+            // Deduct new amount if paid
+            if (isPaid && walletId) {
+                const w = state.wallets.find(wallet => wallet.id === walletId);
+                if (w) w.balance -= convertAmount(amount, currency, w.currency);
+            }
         }
     }
 
     saveStateToStorage();
+    saveWalletsToStorage(); // ensure wallet balances are persistent
+    renderPopoverWallets();
     closeExpenseModal();
     updateUI();
 }
@@ -2531,11 +2839,19 @@ function deleteExpense(id) {
     } else {
         // Show standard confirm for one-time purchases
         if (confirm('Вы уверены, что хотите удалить эту разовую покупку?')) {
+            if (expense.paid && expense.walletId) {
+                const w = state.wallets.find(wallet => wallet.id === expense.walletId);
+                if (w) {
+                    w.balance += convertAmount(expense.amount, expense.currency, w.currency);
+                }
+            }
             if (state.authMode === 'supabase' && state.currentUser) {
                 supabaseClient.from('expenses').delete().eq('id', id)
                     .then(({ error }) => { if (error) console.error('Error deleting expense from Supabase:', error); });
             }
             state.expenses = state.expenses.filter(exp => exp.id !== id);
+            saveWalletsToStorage();
+            renderPopoverWallets();
             saveStateToStorage();
             updateUI();
         }
@@ -2551,11 +2867,21 @@ function closeDeleteModal() {
 // Delete this subscription from ALL months in history and future
 function executeDeleteAll() {
     if (state.deleteTargetSubId) {
+        state.expenses.forEach(exp => {
+            if (exp.subscriptionId === state.deleteTargetSubId && exp.paid && exp.walletId) {
+                const w = state.wallets.find(wallet => wallet.id === exp.walletId);
+                if (w) {
+                    w.balance += convertAmount(exp.amount, exp.currency, w.currency);
+                }
+            }
+        });
         if (state.authMode === 'supabase' && state.currentUser) {
             supabaseClient.from('expenses').delete().eq('subscription_id', state.deleteTargetSubId)
                 .then(({ error }) => { if (error) console.error('Error deleting all subscription instances from Supabase:', error); });
         }
         state.expenses = state.expenses.filter(exp => exp.subscriptionId !== state.deleteTargetSubId);
+        saveWalletsToStorage();
+        renderPopoverWallets();
         saveStateToStorage();
         closeDeleteModal();
         updateUI();
@@ -2567,29 +2893,75 @@ function executeDeleteCurrent() {
     if (state.deleteTargetId) {
         const index = state.expenses.findIndex(exp => exp.id === state.deleteTargetId);
         if (index !== -1) {
-            state.expenses[index].deleted = true;
+            const exp = state.expenses[index];
+            if (exp.paid && exp.walletId) {
+                const w = state.wallets.find(wallet => wallet.id === exp.walletId);
+                if (w) {
+                    w.balance += convertAmount(exp.amount, exp.currency, w.currency);
+                }
+            }
+            exp.deleted = true;
             if (state.authMode === 'supabase' && state.currentUser) {
                 supabaseClient.from('expenses').update({ deleted: true }).eq('id', state.deleteTargetId)
                     .then(({ error }) => { if (error) console.error('Error updating deleted state in Supabase:', error); });
             }
         }
+        saveWalletsToStorage();
+        renderPopoverWallets();
         saveStateToStorage();
         closeDeleteModal();
         updateUI();
     }
 }
 
+function isSameOrFutureMonth(dateStr1, dateStr2) {
+    if (!dateStr1 || !dateStr2) return false;
+    const d1 = new Date(dateStr1);
+    const d2 = new Date(dateStr2);
+    const y1 = d1.getFullYear();
+    const m1 = d1.getMonth();
+    const y2 = d2.getFullYear();
+    const m2 = d2.getMonth();
+    return (y1 > y2) || (y1 === y2 && m1 >= m2);
+}
+
 function toggleActiveStatus(id, isActive) {
     const index = state.expenses.findIndex(exp => exp.id === id);
-    if (index !== -1) {
-        state.expenses[index].active = isActive;
+    if (index === -1) return;
+
+    const targetExpense = state.expenses[index];
+    const isSubscription = targetExpense.type === 'subscription';
+
+    if (isSubscription && targetExpense.subscriptionId) {
+        const subId = targetExpense.subscriptionId;
+        const targetDate = targetExpense.date;
+
+        const promises = [];
+        state.expenses.forEach(exp => {
+            if (exp.subscriptionId === subId && !exp.deleted && isSameOrFutureMonth(exp.date, targetDate)) {
+                exp.active = isActive;
+                if (state.authMode === 'supabase' && state.currentUser) {
+                    const p = supabaseClient.from('expenses').update({ active: isActive }).eq('id', exp.id);
+                    promises.push(p);
+                }
+            }
+        });
+
+        if (promises.length > 0) {
+            Promise.all(promises).then(results => {
+                results.forEach(({ error }) => { if (error) console.error('Error toggling active state in Supabase:', error); });
+            });
+        }
+    } else {
+        targetExpense.active = isActive;
         if (state.authMode === 'supabase' && state.currentUser) {
             supabaseClient.from('expenses').update({ active: isActive }).eq('id', id)
                 .then(({ error }) => { if (error) console.error('Error toggling active status in Supabase:', error); });
         }
-        saveStateToStorage();
-        updateUI();
     }
+
+    saveStateToStorage();
+    updateUI();
 }
 
 // Global toggle for all instances of a subscription
@@ -2619,7 +2991,23 @@ window.toggleSubActiveGlobal = toggleSubActiveGlobal;
 function togglePaidStatus(id, isPaid) {
     const index = state.expenses.findIndex(exp => exp.id === id);
     if (index !== -1) {
-        state.expenses[index].paid = isPaid;
+        const expense = state.expenses[index];
+        expense.paid = isPaid;
+
+        if (expense.walletId) {
+            const wallet = state.wallets.find(w => w.id === expense.walletId);
+            if (wallet) {
+                const amountInWalletCurrency = convertAmount(expense.amount, expense.currency, wallet.currency);
+                if (isPaid) {
+                    wallet.balance -= amountInWalletCurrency;
+                } else {
+                    wallet.balance += amountInWalletCurrency;
+                }
+                saveWalletsToStorage();
+                renderPopoverWallets();
+            }
+        }
+
         if (state.authMode === 'supabase' && state.currentUser) {
             supabaseClient.from('expenses').update({ paid: isPaid }).eq('id', id)
                 .then(({ error }) => { if (error) console.error('Error toggling paid status in Supabase:', error); });
@@ -2871,6 +3259,10 @@ function saveBudgetForm() {
 
 function switchTab(tabName) {
     state.activeTab = tabName;
+
+    if (window.location.hash.replace('#', '') !== tabName) {
+        window.location.hash = tabName;
+    }
 
     const navDashboard = document.getElementById('nav-dashboard');
     const navSubs = document.getElementById('nav-subscriptions');
@@ -3316,7 +3708,10 @@ function renderAnalyticsTab() {
 
         item.innerHTML = `
             <div class="simulator-item-left">
-                <input type="checkbox" class="simulator-checkbox" checked data-sub-id="${sub.subscriptionId}">
+                <label class="simulator-checkbox-container">
+                    <input type="checkbox" class="simulator-checkbox" checked data-sub-id="${sub.subscriptionId}">
+                    <span class="simulator-checkbox-visual"></span>
+                </label>
                 <div class="simulator-item-info">
                     <span class="simulator-item-name">${sub.name}</span>
                     <span class="simulator-item-meta">${PERIOD_MAP[sub.period || 'monthly']} • ${CATEGORY_MAP[sub.category]}</span>
@@ -3561,8 +3956,8 @@ function exportToCSV() {
 // ==========================================================================
 function initCategories() {
     const stored = localStorage.getItem('finchaos_custom_categories');
-    let custom = {};
-    if (stored) {
+    let custom = null;
+    if (stored !== null) {
         try {
             custom = JSON.parse(stored);
         } catch (e) {
@@ -3570,23 +3965,33 @@ function initCategories() {
         }
     }
     
+    // If it's a completely new user / fresh start
+    if (custom === null) {
+        custom = {
+            software: { name: 'Софт / Инструменты', color: 'blue', system: false },
+            entertainment: { name: 'Развлечения / Медиа', color: 'red', system: false },
+            work: { name: 'Работа / Проекты', color: 'green', system: false },
+            utilities: { name: 'Связь и хостинг', color: 'teal', system: false }
+        };
+        localStorage.setItem('finchaos_custom_categories', JSON.stringify(custom));
+    }
+    
     state.categories = {
-        software: { name: 'Софт / Инструменты', color: 'blue', system: true },
-        entertainment: { name: 'Развлечения / Медиа', color: 'red', system: true },
-        work: { name: 'Работа / Проекты', color: 'green', system: true },
-        utilities: { name: 'Связь и хостинг', color: 'teal', system: true },
         other: { name: 'Другое', color: 'slate', system: true }
     };
     
     Object.keys(custom).forEach(id => {
-        state.categories[id] = custom[id];
+        if (id === 'other') return;
+        state.categories[id] = {
+            name: custom[id].name,
+            color: custom[id].color || 'purple',
+            system: false
+        };
     });
 
     // Sync CATEGORY_MAP
     Object.keys(CATEGORY_MAP).forEach(key => {
-        if (key !== 'software' && key !== 'entertainment' && key !== 'work' && key !== 'utilities' && key !== 'other') {
-            delete CATEGORY_MAP[key];
-        }
+        delete CATEGORY_MAP[key];
     });
     Object.keys(state.categories).forEach(id => {
         CATEGORY_MAP[id] = state.categories[id].name;
@@ -3597,10 +4002,11 @@ window.initCategories = initCategories;
 function getCategoryBadgeClass(categoryId) {
     const cat = state.categories[categoryId];
     if (!cat) return 'badge-other';
-    if (cat.system) {
+    const systemIds = ['software', 'entertainment', 'work', 'utilities', 'other'];
+    if (systemIds.includes(categoryId)) {
         return `badge-${categoryId}`;
     } else {
-        return `badge-${cat.color}`;
+        return `badge-${cat.color || 'purple'}`;
     }
 }
 window.getCategoryBadgeClass = getCategoryBadgeClass;
@@ -3683,200 +4089,6 @@ function populateCategoryDropdowns() {
 }
 window.populateCategoryDropdowns = populateCategoryDropdowns;
 
-function renderSettingsCategories() {
-    const listEl = document.getElementById('settings-categories-list');
-    if (!listEl) return;
-    
-    listEl.innerHTML = '';
-    
-    Object.keys(state.categories).forEach(id => {
-        const cat = state.categories[id];
-        const item = document.createElement('div');
-        item.className = 'category-item';
-        item.dataset.id = id;
-        
-        const badgeClass = cat.system ? `badge-${id}` : `badge-${cat.color}`;
-        const nameDisplay = `<span class="badge-category ${badgeClass}">${cat.name}</span>`;
-        
-        let actionsHtml = '';
-        if (cat.system) {
-            actionsHtml = `
-                <span style="color: var(--text-muted); padding: 6px; display: flex; align-items: center;" title="Системная категория защищена">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                </span>
-            `;
-        } else {
-            actionsHtml = `
-                <button type="button" class="btn-card-action btn-edit-cat" title="Редактировать" onclick="editCategoryInline('${id}')">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                </button>
-                <button type="button" class="btn-card-action btn-delete-cat" title="Удалить" onclick="deleteCategory('${id}')">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                </button>
-            `;
-        }
-        
-        item.innerHTML = `
-            <div class="category-item-info">
-                ${nameDisplay}
-            </div>
-            <div class="category-item-actions">
-                ${actionsHtml}
-            </div>
-        `;
-        listEl.appendChild(item);
-    });
-}
-window.renderSettingsCategories = renderSettingsCategories;
-
-function editCategoryInline(id) {
-    const itemEl = document.querySelector(`.category-item[data-id="${id}"]`);
-    if (!itemEl) return;
-    
-    const cat = state.categories[id];
-    if (!cat || cat.system) return;
-    
-    const infoEl = itemEl.querySelector('.category-item-info');
-    const actionsEl = itemEl.querySelector('.category-item-actions');
-    
-    const oldInfoHtml = infoEl.innerHTML;
-    const oldActionsHtml = actionsEl.innerHTML;
-    
-    infoEl.innerHTML = `
-        <input type="text" class="category-item-name-input" value="${cat.name}">
-    `;
-    
-    actionsEl.innerHTML = `
-        <button type="button" class="btn-card-action btn-save-cat-inline" title="Сохранить" style="color: var(--success-text);">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-        </button>
-        <button type="button" class="btn-card-action btn-cancel-cat-inline" title="Отмена" style="color: var(--text-muted);">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
-    `;
-    
-    const input = infoEl.querySelector('.category-item-name-input');
-    input.focus();
-    input.select();
-    
-    actionsEl.querySelector('.btn-save-cat-inline').addEventListener('click', () => {
-        const newName = input.value.trim();
-        if (!newName) {
-            alert('Название категории не может быть пустым!');
-            return;
-        }
-        
-        state.categories[id].name = newName;
-        CATEGORY_MAP[id] = newName;
-        
-        saveCustomCategoriesToStorage();
-        
-        renderSettingsCategories();
-        populateCategoryDropdowns();
-        updateUI();
-    });
-    
-    actionsEl.querySelector('.btn-cancel-cat-inline').addEventListener('click', () => {
-        infoEl.innerHTML = oldInfoHtml;
-        actionsEl.innerHTML = oldActionsHtml;
-    });
-    
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            actionsEl.querySelector('.btn-save-cat-inline').click();
-        } else if (e.key === 'Escape') {
-            actionsEl.querySelector('.btn-cancel-cat-inline').click();
-        }
-    });
-}
-window.editCategoryInline = editCategoryInline;
-
-function addCategory() {
-    const input = document.getElementById('new-category-name');
-    if (!input) return;
-    
-    const name = input.value.trim();
-    if (!name) {
-        alert('Пожалуйста, введите название категории!');
-        return;
-    }
-    
-    const nameExists = Object.values(state.categories).some(c => c.name.toLowerCase() === name.toLowerCase());
-    if (nameExists) {
-        alert('Категория с таким названием уже существует!');
-        return;
-    }
-    
-    const selectedColorEl = document.querySelector('.color-preset-circle.selected');
-    const color = selectedColorEl ? selectedColorEl.dataset.color : 'purple';
-    
-    const id = 'custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-    
-    state.categories[id] = {
-        name: name,
-        color: color,
-        system: false
-    };
-    
-    CATEGORY_MAP[id] = name;
-    
-    input.value = '';
-    
-    saveCustomCategoriesToStorage();
-    
-    renderSettingsCategories();
-    populateCategoryDropdowns();
-    updateUI();
-}
-window.addCategory = addCategory;
-
-function initCategoryColorPicker() {
-    const picker = document.getElementById('category-color-picker');
-    if (!picker) return;
-    
-    const circles = picker.querySelectorAll('.color-preset-circle');
-    circles.forEach(c => {
-        c.addEventListener('click', () => {
-            circles.forEach(other => other.classList.remove('selected'));
-            c.classList.add('selected');
-        });
-    });
-}
-window.initCategoryColorPicker = initCategoryColorPicker;
-
-function deleteCategory(id) {
-    const cat = state.categories[id];
-    if (!cat || cat.system) return;
-    
-    if (confirm(`Вы уверены, что хотите удалить категорию "${cat.name}"? Все расходы и подписки из этой категории будут автоматически перенесены в категорию "Другое" (other).`)) {
-        
-        let modifiedExpenses = false;
-        state.expenses.forEach(exp => {
-            if (exp.category === id) {
-                exp.category = 'other';
-                modifiedExpenses = true;
-                
-                if (state.authMode === 'supabase' && state.currentUser) {
-                    supabaseClient.from('expenses').update({ category: 'other' }).eq('id', exp.id)
-                        .then(({ error }) => { if (error) console.error('Error updating deleted category in Supabase:', error); });
-                }
-            }
-        });
-        
-        delete state.categories[id];
-        delete CATEGORY_MAP[id];
-        
-        saveCustomCategoriesToStorage();
-        if (modifiedExpenses) {
-            saveStateToStorage();
-        }
-        
-        renderSettingsCategories();
-        populateCategoryDropdowns();
-        updateUI();
-    }
-}
-window.deleteCategory = deleteCategory;
 
 function saveCustomCategoriesToStorage() {
     const custom = {};
@@ -4008,19 +4220,25 @@ const STORIES_DATA = [
     {
         title: "Автоматические курсы валют",
         desc: "Мы интегрировали котировки ЦБ РФ! Теперь курсы валют могут обновляться автоматически в фоновом режиме при каждом входе в FinChaos. Больше не нужно вводить значения вручную — просто включите автообновление в настройках.",
-        image: "assets/currency_story.png",
+        previewImage: "assets/currency_preview.png",
+        cardImage: "assets/currency_story.png",
+        previewText: "Авто-курсы ЦБ",
         ctaText: "Включить автообновление"
     },
     {
         title: "Больше удобных выгрузок",
         desc: "В настройки перенесен экспорт ICS для календарей. Добавлена долгожданная выгрузка расходов в CSV (полностью оптимизированная под Microsoft Excel на русском языке с UTF-8 BOM и разделителем «;»). А также резервные копии JSON.",
-        image: "assets/data_story.png",
+        previewImage: "assets/data_preview.png",
+        cardImage: "assets/data_story.png",
+        previewText: "Новый экспорт",
         ctaText: "Открыть экспорт и импорт"
     },
     {
         title: "Облачная синхронизация",
         desc: "FinChaos теперь полноценный облачный сервис на базе Supabase! Ваши расходы, лимиты бюджетов и настройки сохраняются в облаке и доступны с любого устройства. При первой регистрации локальные данные переносятся автоматически.",
-        image: "assets/cloud_story.png"
+        previewImage: "assets/cloud_preview.png",
+        cardImage: "assets/cloud_story.png",
+        previewText: "Облачная синхронизация"
     }
 ];
 
@@ -4031,6 +4249,30 @@ let storyPaused = false;
 let storyLockedPaused = false;
 const STORY_DURATION = 20000; // 20 seconds per slide
 const STORY_TICK = 50; // Update progress every 50ms
+
+function renderStoryPreviews() {
+    const container = document.getElementById('story-previews-container');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    STORIES_DATA.forEach((story, idx) => {
+        const card = document.createElement('div');
+        card.className = 'story-circle-card';
+        card.style.backgroundImage = `url('${story.previewImage}')`;
+        card.onclick = () => openStory(idx);
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'story-card-overlay';
+        
+        const span = document.createElement('span');
+        span.className = 'story-card-text';
+        span.textContent = story.previewText || story.title;
+        
+        overlay.appendChild(span);
+        card.appendChild(overlay);
+        container.appendChild(card);
+    });
+}
 
 function openStory(index) {
     activeStoryIndex = index;
@@ -4093,7 +4335,7 @@ function loadStoryContent(index) {
     if (titleEl) titleEl.textContent = story.title;
     if (descEl) descEl.textContent = story.desc;
     if (imgContainer) {
-        imgContainer.style.backgroundImage = `url('${story.image}')`;
+        imgContainer.style.backgroundImage = `url('${story.cardImage}')`;
     }
     
     const ctaBtn = document.getElementById('story-viewer-cta');
@@ -4132,6 +4374,7 @@ function stopStoryTimer() {
     }
 }
 
+// Function to manually update progress bar visually
 function updateProgressBar(idx, pct) {
     const fill = document.getElementById(`story-progress-fill-${idx}`);
     if (fill) {
@@ -4253,6 +4496,273 @@ window.prevStory = prevStory;
 window.toggleStoryPause = toggleStoryPause;
 window.setupStoriesHoldListeners = setupStoriesHoldListeners;
 window.handleStoryCTA = handleStoryCTA;
+window.renderStoryPreviews = renderStoryPreviews;
+
+// ==========================================================================
+// Welcome Onboarding Wizard Logic
+// ==========================================================================
+let wizardStep = 1;
+
+function showOnboardingWizard() {
+    const modal = document.getElementById('onboarding-wizard-modal');
+    if (!modal) return;
+    
+    modal.classList.add('active');
+    wizardStep = 1;
+    updateWizardStepDisplay();
+    initCustomSelects(); // In case there are newly rendered select-styled fields in the wizard modal
+    updateWizardWalletsScroll();
+}
+window.showOnboardingWizard = showOnboardingWizard;
+
+function skipOnboardingWizard() {
+    localStorage.setItem('finchaos_onboarding_wizard_completed', 'true');
+    localStorage.setItem('finchaos_onboarding_completed', 'true'); // also skip tour
+    
+    const wizardModal = document.getElementById('onboarding-wizard-modal');
+    if (wizardModal) wizardModal.classList.remove('active');
+    
+    showToast('Настройка пропущена. Вы можете настроить имя, валюту и счета в разделе Профиль.', 'info');
+    updateUI();
+}
+window.skipOnboardingWizard = skipOnboardingWizard;
+
+function updateWizardStepDisplay() {
+    // Hide all steps
+    document.querySelectorAll('.wizard-step').forEach(step => {
+        step.classList.remove('active');
+    });
+    
+    // Show current step
+    const currentStepEl = document.getElementById(`wizard-step-${wizardStep}`);
+    if (currentStepEl) currentStepEl.classList.add('active');
+    
+    // Update progress dots
+    document.querySelectorAll('.wizard-progress .step-dot').forEach(dot => {
+        const stepNum = parseInt(dot.dataset.step);
+        if (stepNum === wizardStep) {
+            dot.classList.add('active');
+        } else {
+            dot.classList.remove('active');
+        }
+    });
+    
+    // Update footer buttons
+    const prevBtn = document.getElementById('btn-wizard-prev');
+    const nextBtn = document.getElementById('btn-wizard-next');
+    
+    if (wizardStep === 1) {
+        prevBtn.classList.add('hidden');
+    } else {
+        prevBtn.classList.remove('hidden');
+    }
+    
+    if (wizardStep === 4) {
+        nextBtn.textContent = 'Начать работу!';
+    } else {
+        nextBtn.textContent = 'Далее';
+    }
+}
+
+function handleWizardNext() {
+    if (wizardStep === 1) {
+        const usernameInput = document.getElementById('wizard-username');
+        const username = usernameInput ? usernameInput.value.trim() : '';
+        if (!username) {
+            showToast('Пожалуйста, введите ваше имя!', 'warning');
+            if (usernameInput) usernameInput.focus();
+            return;
+        }
+    }
+    
+    if (wizardStep < 4) {
+        wizardStep++;
+        updateWizardStepDisplay();
+    } else {
+        completeOnboardingWizard();
+    }
+}
+
+function handleWizardPrev() {
+    if (wizardStep > 1) {
+        wizardStep--;
+        updateWizardStepDisplay();
+    }
+}
+
+function addWizardWalletRow() {
+    const container = document.getElementById('wizard-wallets-container');
+    if (!container) return;
+    
+    const row = document.createElement('div');
+    row.className = 'wizard-wallet-row';
+    row.style.display = 'flex';
+    row.style.gap = '8px';
+    row.style.alignItems = 'center';
+    row.style.marginTop = '10px';
+    
+    row.innerHTML = `
+        <input type="text" class="form-input w-wallet-name" placeholder="Название (например: Tinkoff)" style="flex: 2;">
+        <input type="number" class="form-input w-wallet-balance" placeholder="Баланс" style="flex: 1.5;" min="0">
+        <select class="select-styled w-wallet-currency" style="flex: 1;">
+            <option value="RUB" selected>RUB (₽)</option>
+            <option value="USD">USD ($)</option>
+            <option value="EUR">EUR (€)</option>
+        </select>
+        <button type="button" class="btn-card-action delete-wallet-row" style="color: var(--danger-text); padding: 6px; border: none; background: none; cursor: pointer;" title="Удалить">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+    `;
+    
+    container.appendChild(row);
+    
+    // Bind deletion button
+    row.querySelector('.delete-wallet-row').addEventListener('click', () => {
+        row.remove();
+        updateWizardWalletsScroll();
+    });
+    
+    initCustomSelects();
+    updateWizardWalletsScroll();
+}
+
+function updateWizardWalletsScroll() {
+    const container = document.getElementById('wizard-wallets-container');
+    if (!container) return;
+    const rows = container.querySelectorAll('.wizard-wallet-row');
+    if (rows.length > 2) {
+        container.style.overflowY = 'auto';
+    } else {
+        container.style.overflowY = 'hidden';
+    }
+}
+
+function completeOnboardingWizard() {
+    const username = document.getElementById('wizard-username').value.trim();
+    const currency = document.getElementById('wizard-currency').value;
+    
+    // Save personal settings
+    state.profileName = username;
+    state.globalCurrency = currency;
+    localStorage.setItem('finchaos_username', username);
+    localStorage.setItem('finchaos_currency', currency);
+    
+    // Categories
+    const custom = {};
+    const defaultCatCheckboxes = {
+        software: { id: 'w-cat-software', name: 'Софт / Инструменты', color: 'blue' },
+        entertainment: { id: 'w-cat-entertainment', name: 'Развлечения / Медиа', color: 'red' },
+        work: { id: 'w-cat-work', name: 'Работа / Проекты', color: 'green' },
+        utilities: { id: 'w-cat-utilities', name: 'Связь и хостинг', color: 'teal' }
+    };
+    
+    Object.keys(defaultCatCheckboxes).forEach(key => {
+        const item = defaultCatCheckboxes[key];
+        const cb = document.getElementById(item.id);
+        if (cb && cb.checked) {
+            custom[key] = { name: item.name, color: item.color, system: false };
+        }
+    });
+    
+    const customInput = document.getElementById('wizard-custom-categories');
+    if (customInput && customInput.value.trim()) {
+        const items = customInput.value.split(',');
+        items.forEach((item, index) => {
+            const name = item.trim();
+            if (name) {
+                const id = 'custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5) + index;
+                // pick a preset color
+                const colors = ['purple', 'pink', 'orange', 'teal', 'indigo', 'cyan'];
+                const color = colors[index % colors.length];
+                custom[id] = { name: name, color: color, system: false };
+            }
+        });
+    }
+    
+    // Always include fallback 'other'
+    state.categories = {
+        other: { name: 'Другое', color: 'slate', system: true }
+    };
+    Object.keys(custom).forEach(id => {
+        state.categories[id] = custom[id];
+    });
+    
+    localStorage.setItem('finchaos_custom_categories', JSON.stringify(custom));
+    
+    // Sync CATEGORY_MAP
+    Object.keys(CATEGORY_MAP).forEach(key => {
+        delete CATEGORY_MAP[key];
+    });
+    Object.keys(state.categories).forEach(id => {
+        CATEGORY_MAP[id] = state.categories[id].name;
+    });
+    
+    // Wallets
+    state.wallets = [];
+    const walletRows = document.querySelectorAll('.wizard-wallet-row');
+    walletRows.forEach(row => {
+        const wName = row.querySelector('.w-wallet-name').value.trim();
+        const wBalance = parseFloat(row.querySelector('.w-wallet-balance').value) || 0;
+        const wCurrency = row.querySelector('.w-wallet-currency').value;
+        
+        if (wName) {
+            state.wallets.push({
+                id: 'wallet-' + Math.random().toString(36).substr(2, 9),
+                name: wName,
+                balance: wBalance,
+                currency: wCurrency
+            });
+        }
+    });
+    saveWalletsToStorage();
+    
+    // Demo Mode Selection
+    const demoModeRadio = document.querySelector('input[name="wizard-demo-mode"]:checked');
+    const demoMode = demoModeRadio ? demoModeRadio.value : 'demo';
+    
+    if (demoMode === 'demo') {
+        const demoExpenses = generateDemoData();
+        // Map missing categories to 'other'
+        demoExpenses.forEach(exp => {
+            if (!state.categories[exp.category]) {
+                exp.category = 'other';
+            }
+        });
+        state.expenses = demoExpenses;
+    } else {
+        state.expenses = [];
+        state.budgets = {};
+        // Set a default budget anyway
+        const now = new Date();
+        const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        state.budgets[currentMonthKey] = 25000;
+    }
+    saveStateToStorage();
+    
+    // Onboarding Flags
+    localStorage.setItem('finchaos_onboarding_wizard_completed', 'true');
+    
+    const wizardModal = document.getElementById('onboarding-wizard-modal');
+    if (wizardModal) wizardModal.classList.remove('active');
+    
+    // Update application display
+    updateUI();
+    renderPopoverWallets();
+    populateCategoryDropdowns();
+    
+    // Update sidebar profile card UI elements directly
+    const userNameEl = document.getElementById('user-profile-name');
+    if (userNameEl) userNameEl.textContent = state.profileName;
+    
+    showToast('Настройка успешно завершена! Добро пожаловать.', 'success');
+    
+    if (demoMode === 'demo') {
+        localStorage.removeItem('finchaos_onboarding_completed'); // Reset tour so it plays for this new user
+        setTimeout(() => startOnboardingTour(), 1500);
+    } else {
+        localStorage.setItem('finchaos_onboarding_completed', 'true'); // Skip tour for clean starts unless they manually trigger
+    }
+}
 
 function initCustomSelects() {
     const selects = document.querySelectorAll('.select-styled');
@@ -4381,7 +4891,6 @@ function initCustomSelects() {
         }
     });
 }
-
 function closeAllDropdowns() {
     document.querySelectorAll('.custom-select-container').forEach(c => {
         c.classList.remove('open');
@@ -4495,6 +5004,32 @@ function saveWalletsToStorage() {
     localStorage.setItem('finchaos_wallets', JSON.stringify(state.wallets));
 }
 
+function populateWalletDropdown() {
+    const expenseWallet = document.getElementById('expense-wallet');
+    if (!expenseWallet) return;
+
+    const currentVal = expenseWallet.value;
+    expenseWallet.innerHTML = '<option value="">-- Не выбрано (Без списания) --</option>';
+
+    state.wallets.forEach(wallet => {
+        const opt = document.createElement('option');
+        opt.value = wallet.id;
+        opt.textContent = `${wallet.name} (${formatCurrency(wallet.balance, wallet.currency)})`;
+        expenseWallet.appendChild(opt);
+    });
+
+    // Restore selected value if valid, otherwise keep empty
+    const exists = state.wallets.some(w => w.id === currentVal);
+    expenseWallet.value = exists ? currentVal : "";
+
+    // Reset custom select
+    if (expenseWallet.nextElementSibling && expenseWallet.nextElementSibling.classList.contains('custom-select-container')) {
+        expenseWallet.nextElementSibling.remove();
+    }
+    initCustomSelects();
+}
+window.populateWalletDropdown = populateWalletDropdown;
+
 function renderPopoverWallets() {
     const listEl = document.getElementById('popover-wallets-list');
     if (!listEl) return;
@@ -4522,7 +5057,7 @@ function renderPopoverWallets() {
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                 </button>
                 <button type="button" class="wallet-action-btn delete-btn" onclick="deleteWallet('${wallet.id}')" title="Удалить">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2 2v2"></path></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2 2v2"></path></svg>
                 </button>
             </div>
         `;
@@ -4534,8 +5069,12 @@ function renderPopoverWallets() {
     if (totalLabelEl) {
         totalLabelEl.textContent = formatCurrency(totalInGlobal, state.globalCurrency);
     }
+    
+    populateWalletDropdown();
 }
 window.renderPopoverWallets = renderPopoverWallets;
+
+
 
 function addWallet(name, balance, currency) {
     const wallet = {
@@ -4641,6 +5180,28 @@ function renderProfileTab() {
     const eurInput = document.getElementById('rate-eur-input-new');
     if (usdInput) usdInput.value = state.rates.USD;
     if (eurInput) eurInput.value = state.rates.EUR;
+
+    // Toggle security forms and locks based on authMode
+    const demoLockEl = document.getElementById('security-demo-lock');
+    const formsContainerEl = document.getElementById('security-forms-container');
+    const emailFormInput = document.getElementById('security-new-email');
+    const passwordFormInput = document.getElementById('security-new-password');
+    const securityAlert = document.getElementById('security-alert-msg');
+    
+    if (securityAlert) {
+        securityAlert.className = 'auth-alert hidden';
+        securityAlert.textContent = '';
+    }
+    if (emailFormInput) emailFormInput.value = '';
+    if (passwordFormInput) passwordFormInput.value = '';
+
+    if (state.authMode === 'supabase' && state.currentUser) {
+        if (demoLockEl) demoLockEl.classList.add('hidden');
+        if (formsContainerEl) formsContainerEl.classList.remove('hidden');
+    } else {
+        if (demoLockEl) demoLockEl.classList.remove('hidden');
+        if (formsContainerEl) formsContainerEl.classList.add('hidden');
+    }
 
     syncRatesInputStateNew();
     renderSettingsCategoriesNew();
@@ -4749,8 +5310,20 @@ function editCategoryInlineNew(id) {
     const oldInfoHtml = infoEl.innerHTML;
     const oldActionsHtml = actionsEl.innerHTML;
     
+    let activeColor = cat.color || 'purple';
+    
     infoEl.innerHTML = `
-        <input type="text" class="category-item-name-input" value="${cat.name}">
+        <div style="display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 180px;">
+            <input type="text" class="category-item-name-input" value="${cat.name}" style="width: 100%; box-sizing: border-box;">
+            <div class="color-presets-picker inline-color-picker" style="margin-top: 2px;">
+                <div class="color-preset-circle purple ${activeColor === 'purple' ? 'selected' : ''}" data-color="purple" title="Фиолетовый"></div>
+                <div class="color-preset-circle pink ${activeColor === 'pink' ? 'selected' : ''}" data-color="pink" title="Розовый"></div>
+                <div class="color-preset-circle orange ${activeColor === 'orange' ? 'selected' : ''}" data-color="orange" title="Оранжевый"></div>
+                <div class="color-preset-circle teal ${activeColor === 'teal' ? 'selected' : ''}" data-color="teal" title="Бирюзовый"></div>
+                <div class="color-preset-circle indigo ${activeColor === 'indigo' ? 'selected' : ''}" data-color="indigo" title="Индиго"></div>
+                <div class="color-preset-circle cyan ${activeColor === 'cyan' ? 'selected' : ''}" data-color="cyan" title="Голубой"></div>
+            </div>
+        </div>
     `;
     
     actionsEl.innerHTML = `
@@ -4766,6 +5339,15 @@ function editCategoryInlineNew(id) {
     input.focus();
     input.select();
     
+    const colorCircles = infoEl.querySelectorAll('.inline-color-picker .color-preset-circle');
+    colorCircles.forEach(circle => {
+        circle.addEventListener('click', () => {
+            colorCircles.forEach(c => c.classList.remove('selected'));
+            circle.classList.add('selected');
+            activeColor = circle.dataset.color;
+        });
+    });
+    
     actionsEl.querySelector('.btn-save-cat-inline').addEventListener('click', () => {
         const newName = input.value.trim();
         if (!newName) {
@@ -4774,6 +5356,7 @@ function editCategoryInlineNew(id) {
         }
         
         state.categories[id].name = newName;
+        state.categories[id].color = activeColor;
         CATEGORY_MAP[id] = newName;
         
         saveCustomCategoriesToStorage();
@@ -4808,6 +5391,10 @@ function deleteCategoryNew(id) {
             if (exp.category === id) {
                 exp.category = 'other';
                 modifiedExpenses = true;
+                if (state.authMode === 'supabase' && state.currentUser) {
+                    supabaseClient.from('expenses').update({ category: 'other' }).eq('id', exp.id)
+                        .then(({ error }) => { if (error) console.error('Error updating deleted category in Supabase:', error); });
+                }
             }
         });
         
@@ -4826,6 +5413,7 @@ function deleteCategoryNew(id) {
     }
 }
 window.deleteCategoryNew = deleteCategoryNew;
+
 
 function addCategoryNew() {
     const input = document.getElementById('new-category-name-new');

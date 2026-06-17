@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FinChaos — Трекер расходов и подписок</title>
+    <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,10 +20,7 @@
         <div class="auth-card">
             <div class="auth-header">
                 <div class="brand-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M12 6v12M15 9H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H8"></path>
-                    </svg>
+                    <img src="assets/logo.svg" alt="FinChaos">
                 </div>
                 <h2 class="auth-brand-name">FinChaos</h2>
                 <p class="auth-subtitle">Управление расходами и подписками в облаке</p>
@@ -62,10 +60,7 @@
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <div class="brand-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M12 6v12M15 9H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H8"></path>
-                    </svg>
+                    <img src="assets/logo.svg" alt="FinChaos">
                 </div>
                 <span class="brand-name">FinChaos</span>
             </div>
@@ -192,29 +187,15 @@
                 <div id="view-dashboard" class="app-view">
                     <!-- Stories Widget -->
                     <section class="stories-container" id="dashboard-stories" style="margin-bottom: 24px; padding: 12px 6px; margin-left: -6px; margin-right: -6px; overflow-x: auto; -webkit-overflow-scrolling: touch;">
-                        <div class="stories-scroll" style="display: flex; gap: 16px;">
-                            <div class="story-circle-card" onclick="openStory(0)" style="background-image: url('assets/currency_story.png');">
-                                <div class="story-card-overlay">
-                                    <span class="story-card-text">Авто-курсы ЦБ</span>
-                                </div>
-                            </div>
-                            <div class="story-circle-card" onclick="openStory(1)" style="background-image: url('assets/data_story.png');">
-                                <div class="story-card-overlay">
-                                    <span class="story-card-text">Новый экспорт</span>
-                                </div>
-                            </div>
-                            <div class="story-circle-card" onclick="openStory(2)" style="background-image: url('assets/cloud_story.png');">
-                                <div class="story-card-overlay">
-                                    <span class="story-card-text">Облачная синхронизация</span>
-                                </div>
-                            </div>
+                        <div class="stories-scroll" id="story-previews-container" style="display: flex; gap: 16px;">
+                            <!-- Рендерится динамически из JS -->
                         </div>
                     </section>
 
                     <!-- Top Header -->
                     <header class="header">
                         <div class="header-title-wrapper">
-                            <h1>Управление расходами</h1>
+                            <h1 id="dashboard-greeting-title">Управление расходами</h1>
                             <p class="subtitle">Планируйте свои подписки и регулярные платежи</p>
                         </div>
                         
@@ -615,19 +596,64 @@
                         </div>
 
                         <!-- Section: Simulated Preferences (Email notifications) -->
-                        <div class="settings-card">
+                        <div class="settings-card" style="opacity: 0.65; position: relative; pointer-events: none; user-select: none;">
+                            <div style="position: absolute; top: 20px; right: 20px; background-color: rgba(132, 204, 22, 0.1); color: var(--primary); font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: var(--radius-full); border: 1px solid rgba(132, 204, 22, 0.2); letter-spacing: 0.2px;">В разработке</div>
                             <h3 class="settings-card-title">Настройки уведомлений</h3>
                             <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Получайте напоминания об оплате подписок</p>
                             <div class="form-group" style="flex-direction: row; align-items: flex-start; gap: 8px; display: flex;">
                                 <label class="switch" style="flex-shrink: 0;">
-                                    <input type="checkbox" id="profile-notif-news">
+                                    <input type="checkbox" id="profile-notif-news" disabled>
                                     <span class="slider"></span>
                                 </label>
                                 <div style="display: flex; flex-direction: column;">
-                                    <label for="profile-notif-news" class="form-label" style="cursor: pointer; margin-bottom: 2px; font-size: 13px; font-weight: 500;">Уведомления на email</label>
+                                    <label class="form-label" style="margin-bottom: 2px; font-size: 13px; font-weight: 500; color: var(--text-secondary);">Уведомления на email</label>
                                     <span style="font-size: 12px; color: var(--text-muted);">Присылать напоминания за 3 дня до даты списания активных подписок.</span>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Section: Security (Email & Password change) -->
+                        <div class="settings-card" id="settings-card-security">
+                            <h3 class="settings-card-title">Безопасность аккаунта</h3>
+                            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Обновление ваших облачных учетных данных</p>
+                            
+                            <!-- Demo mode lock placeholder -->
+                            <div id="security-demo-lock" class="hidden" style="display: flex; flex-direction: column; gap: 8px; padding: 20px; background-color: rgba(132, 204, 22, 0.05); border: 1px dashed rgba(132, 204, 22, 0.25); border-radius: var(--radius-md); text-align: center; align-items: center; margin-bottom: 8px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px; color: var(--primary); margin-bottom: 4px;">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                </svg>
+                                <span style="font-size: 14px; font-weight: 700; color: var(--text-primary);">Раздел доступен в облачном режиме</span>
+                                <span style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; max-width: 280px;">Зарегистрируйте аккаунт или войдите в профиль через Supabase, чтобы управлять паролями и почтой в облаке.</span>
+                            </div>
+
+                            <div id="security-forms-container">
+                                <!-- Email Change Form -->
+                                <form id="profile-email-change-form" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+                                    <div class="form-group">
+                                        <label for="security-new-email" class="form-label" style="font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px;">Новый Email</label>
+                                        <div style="display: flex; gap: 8px;">
+                                            <input type="email" id="security-new-email" class="form-input" placeholder="new-email@domain.com" style="flex-grow: 1; height: 38px; font-size: 13px;" required>
+                                            <button type="submit" class="btn-primary" style="height: 38px; padding: 0 16px; font-size: 13px; font-weight: 600; justify-content: center;">Обновить Email</button>
+                                        </div>
+                                        <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block;">Потребуется подтверждение с переходом по ссылкам на старой и новой почте.</span>
+                                    </div>
+                                </form>
+
+                                <!-- Password Change Form -->
+                                <form id="profile-password-change-form" style="display: flex; flex-direction: column; gap: 12px;">
+                                    <div class="form-group">
+                                        <label for="security-new-password" class="form-label" style="font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px;">Новый пароль</label>
+                                        <div style="display: flex; gap: 8px;">
+                                            <input type="password" id="security-new-password" class="form-input" placeholder="Минимум 6 символов..." style="flex-grow: 1; height: 38px; font-size: 13px;" required minlength="6">
+                                            <button type="submit" class="btn-primary" style="height: 38px; padding: 0 16px; font-size: 13px; font-weight: 600; justify-content: center;">Обновить пароль</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Security message container -->
+                            <div id="security-alert-msg" class="auth-alert hidden" style="margin-top: 16px; font-size: 12px; padding: 10px 14px; border-radius: var(--radius-md); line-height: 1.4;"></div>
                         </div>
                     </div>
 
@@ -788,6 +814,13 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="expense-wallet" class="form-label">Счет для списания (необязательно)</label>
+                    <select id="expense-wallet" class="select-styled w-100">
+                        <option value="">-- Не выбрано (Без списания) --</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
                     <label for="expense-link" class="form-label">Ссылка для оплаты/покупки (необязательно)</label>
                     <input type="url" id="expense-link" class="form-input" placeholder="https://adobe.com/ru/...">
                 </div>
@@ -884,11 +917,8 @@
                 </div>
                 <div class="story-viewer-header">
                     <div class="story-brand-wrapper" style="display: flex; align-items: center; gap: 8px;">
-                        <div class="story-brand-icon" style="color: var(--primary); width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 100%; height: 100%;">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <path d="M12 6v12M15 9H9.5a2.5 2.5 0 0 0 0 5h5a2.5 2.5 0 0 1 0 5H8"></path>
-                            </svg>
+                        <div class="story-brand-icon" style="width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;">
+                            <img src="assets/logo.svg" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;">
                         </div>
                         <span class="story-brand" style="color: white; font-size: 13px; font-weight: 700; font-family: 'Inter', sans-serif;">FinChaos</span>
                     </div>
@@ -903,6 +933,128 @@
                         <button class="story-cta-btn" id="story-viewer-cta" onclick="handleStoryCTA()">Включить автообновление</button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Onboarding Wizard -->
+    <div class="modal-overlay" id="onboarding-wizard-modal">
+        <div class="modal-container wizard-container">
+            <div class="wizard-header">
+                <h2>Настройка аккаунта</h2>
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <button type="button" id="btn-wizard-skip" class="wizard-skip-btn">Пропустить</button>
+                    <div class="wizard-progress">
+                        <span class="step-dot active" data-step="1"></span>
+                        <span class="step-dot" data-step="2"></span>
+                        <span class="step-dot" data-step="3"></span>
+                        <span class="step-dot" data-step="4"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="wizard-body">
+                <!-- Step 1: Username & Currency -->
+                <div class="wizard-step active" id="wizard-step-1">
+                    <h3 class="wizard-step-title">Как к вам обращаться?</h3>
+                    <p class="wizard-step-desc">Введите ваше имя для приветствий на дашборде и выберите основную валюту для отображения графиков и баланса.</p>
+                    
+                    <div class="form-group" style="margin-top: 16px;">
+                        <label for="wizard-username" class="form-label">Ваше имя</label>
+                        <input type="text" id="wizard-username" class="form-input" placeholder="Например: Александр" required>
+                    </div>
+                    
+                    <div class="form-group" style="margin-top: 16px;">
+                        <label for="wizard-currency" class="form-label">Основная валюта учета</label>
+                        <select id="wizard-currency" class="select-styled w-100">
+                            <option value="RUB" selected>RUB (₽)</option>
+                            <option value="USD">USD ($)</option>
+                            <option value="EUR">EUR (€)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Step 2: Categories Setup -->
+                <div class="wizard-step" id="wizard-step-2">
+                    <h3 class="wizard-step-title">Категории расходов</h3>
+                    <p class="wizard-step-desc">Выберите категории, которые вы планируете использовать. Вы сможете отредактировать их или удалить в любой момент.</p>
+                    
+                    <div class="wizard-categories-list" style="display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0;">
+                        <label class="wizard-checkbox-item">
+                            <input type="checkbox" id="w-cat-software" checked>
+                            <span class="badge-category badge-software">Софт / Инструменты</span>
+                        </label>
+                        <label class="wizard-checkbox-item">
+                            <input type="checkbox" id="w-cat-entertainment" checked>
+                            <span class="badge-category badge-entertainment">Развлечения / Медиа</span>
+                        </label>
+                        <label class="wizard-checkbox-item">
+                            <input type="checkbox" id="w-cat-work" checked>
+                            <span class="badge-category badge-work">Работа / Проекты</span>
+                        </label>
+                        <label class="wizard-checkbox-item">
+                            <input type="checkbox" id="w-cat-utilities" checked>
+                            <span class="badge-category badge-utilities">Связь и хостинг</span>
+                        </label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="wizard-custom-categories" class="form-label">Добавить свои категории (через запятую)</label>
+                        <input type="text" id="wizard-custom-categories" class="form-input" placeholder="Например: Продукты, Кафе, Транспорт...">
+                    </div>
+                </div>
+                
+                <!-- Step 3: Wallets Setup -->
+                <div class="wizard-step" id="wizard-step-3">
+                    <h3 class="wizard-step-title">Счета и кошельки</h3>
+                    <p class="wizard-step-desc">Настройте свои банковские карты или кошельки (необязательно). Вы можете пропустить этот шаг, оставив поля пустыми.</p>
+                    
+                    <div id="wizard-wallets-container" style="display: flex; flex-direction: column; gap: 10px; margin-top: 12px; max-height: 180px; overflow-y: auto; overflow-x: hidden; padding-right: 4px;">
+                        <div class="wizard-wallet-row" style="display: flex; gap: 8px; align-items: center;">
+                            <input type="text" class="form-input w-wallet-name" placeholder="Название (например: Наличные)" style="flex: 2;">
+                            <input type="number" class="form-input w-wallet-balance" placeholder="Баланс" style="flex: 1.5;" min="0">
+                            <select class="select-styled w-wallet-currency" style="flex: 1;">
+                                <option value="RUB" selected>RUB (₽)</option>
+                                <option value="USD">USD ($)</option>
+                                <option value="EUR">EUR (€)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button type="button" class="btn-secondary" id="btn-wizard-add-wallet" style="margin-top: 12px; height: 32px; font-size: 12px; padding: 0 10px;">
+                        + Добавить счет
+                    </button>
+                </div>
+                
+                <!-- Step 4: Demo Data Setup -->
+                <div class="wizard-step" id="wizard-step-4">
+                    <h3 class="wizard-step-title">Как вы хотите начать?</h3>
+                    <p class="wizard-step-desc">Мы можем наполнить приложение демонстрационными данными, чтобы вы сразу оценили графики и календарь, либо вы можете начать с пустого кабинета.</p>
+                    
+                    <div class="wizard-demo-selector" style="display: flex; flex-direction: column; gap: 12px; margin-top: 16px;">
+                        <label class="wizard-radio-item active" id="wizard-radio-demo-label">
+                            <input type="radio" name="wizard-demo-mode" value="demo" checked style="display: none;">
+                            <div class="radio-indicator"></div>
+                            <div class="radio-content">
+                                <span class="radio-title">Начать с демо-данными (Рекомендуется)</span>
+                                <span class="radio-desc">Загрузить примеры регулярных подписок (Adobe CC, Spotify, ЖКХ) и разовых покупок.</span>
+                            </div>
+                        </label>
+                        <label class="wizard-radio-item" id="wizard-radio-clean-label">
+                            <input type="radio" name="wizard-demo-mode" value="clean" style="display: none;">
+                            <div class="radio-indicator"></div>
+                            <div class="radio-content">
+                                <span class="radio-title">Начать с чистого листа</span>
+                                <span class="radio-desc">Создавать все расходы с нуля самостоятельно. Кабинет будет готов к вашей работе.</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="wizard-footer">
+                <button type="button" class="btn-secondary hidden" id="btn-wizard-prev">Назад</button>
+                <button type="button" class="btn-primary" id="btn-wizard-next" style="margin-left: auto;">Далее</button>
             </div>
         </div>
     </div>
